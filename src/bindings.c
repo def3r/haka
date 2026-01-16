@@ -18,6 +18,6 @@ void loadBindings(struct keyBindings *kbinds, struct keyState* ks) {
   Bind(writeToFile,       KEY_C);
   Bind(switchFile,        KEY_M);
   Bind(openFile,          KEY_O);
-  Bind(writePointToFile,  KEY_DOT);
+  Bind(writePointToFile,  KEY_GRAVE);
   Bind(sendNewlineToFile, KEY_N);
 }

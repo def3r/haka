@@ -7,6 +7,17 @@ Simply select text, press the key combination, and it's added to your file! With
   <img src="https://github.com/user-attachments/assets/94bfdb3c-b3ee-4772-bb04-be72dfc07517" alt="Haka demo"/>
 </p>
 
+- [Installation](https://github.com/def3r/haka?tab=readme-ov-file#build)
+  - [Permissions](https://github.com/def3r/haka?tab=readme-ov-file#permissions)
+- [Daemon](https://github.com/def3r/haka?tab=readme-ov-file#hakaservice)
+- [Configuration](https://github.com/def3r/haka?tab=readme-ov-file#config)
+  - [Config Options](https://github.com/def3r/haka?tab=readme-ov-file#config-options)
+- [Guide](https://github.com/def3r/haka?tab=readme-ov-file#guide)
+  - [Keybinds](https://github.com/def3r/haka?tab=readme-ov-file#keybinds)
+- [Troubleshoot](https://github.com/def3r/haka?tab=readme-ov-file#troubleshoot)
+
+---
+
 ## Project Aim
 This project aims to solve a problem I face when making notes: efficiently
 creating and organizing notes when you have a large volume of resources and
@@ -125,6 +136,16 @@ Now bind your action to a key in *`src/bindings.c`* using the `Bind(function, KE
 | *`Ctrl+Alt + N`* | Send a Blank Line to the current file |
 | *`Ctrl+Alt + M`* | Opens the file selection menu |
 | *`Ctrl+Alt + O`* | Opens the file in neovim |
+
+
+## Troubleshoot
+- If some processes do not work/launch, this is usually because at the time of booting, required env variables were not set. This is a known issue.
+  `systemctl --user restart haka` should be done after booting.
+
+- If noo keybind is working, the issue is most probably with `keyd`. `keyd` and `haka` cannot run simultaneously. This is because `keyd` grabs
+  the input devies, thus leaving `haka` to poll the input devices indefinitely. `kill`ing the `keyd` process should resolve the issue.<br>
+  Confirm `keyd` is running: `pgrep keyd`.<br>
+  To kill all procs with keyd: `killall -s 0 keyd`
 
 ## TODO
 - [ ] Switch to gtk(?): to reduce dependencies.

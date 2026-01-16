@@ -181,10 +181,10 @@ int openKbdDevices(struct IntSet *set, int *fds, struct libevdev **devs) {
   char kbd[BUFSIZE];
   struct libevdev *dev = NULL;
 
-  printf("------\n");
+  Fprintln(stdout, "------");
   for (int i = 0; i < set->size; i++) {
     snprintf(kbd, BUFSIZE, "/dev/input/event%d", set->set[i]);
-    printf("Opening: %s\n", kbd);
+    Fprintln(stdout, "Opening: %s", kbd);
 
     fd = open(kbd, O_RDONLY | O_NONBLOCK);
     if (fd < 0) {
@@ -193,8 +193,8 @@ int openKbdDevices(struct IntSet *set, int *fds, struct libevdev **devs) {
     }
 
     libevdev_new_from_fd(fd, &dev);
-    printf("Device: %s\n", libevdev_get_name(dev));
-    printf("Listening for key events...\n");
+    Fprintln(stdout, "Device: %s\nfd: %d", libevdev_get_name(dev), fd);
+    Fprintln(stdout, "Listening for key events...\n------");
     fds[i] = fd;
     devs[i] = dev;
   }

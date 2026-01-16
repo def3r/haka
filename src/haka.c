@@ -65,9 +65,8 @@ int main() {
 
     int ready = select(maxFd + 1, &fdSet, NULL, NULL, NULL);
     if (ready < 0) {
-      if (errno == EINTR) {
         continue;
-      } else {
+      if (errno != EINTR) {
         perror("select");
         break;
       }
@@ -184,6 +183,7 @@ bool resetActivationCombo(struct keyState *ks) {
 }
 
 bool activated(struct keyState *ks) {
+  Fprintln(stdout, "pressed!");
   for (int i = 0; i < ks->activationCombo->size; i++) {
     if (!ks->keyPress[ks->activationCombo->set[i]]) {
       return false;
