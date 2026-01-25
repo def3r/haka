@@ -243,6 +243,31 @@ void writeSubPointToFile(struct hakaContext *haka) {
   // eventHandlerEpilogue(haka);
 }
 
+void spawnChild(struct hakaContext *haka, char *argv[]) {
+  contextCheck(haka);
+  if (argv == NULL || *argv == NULL) {
+    Fprintln(stderr, "no args provided to spawn a child");
+    return;
+  }
+
+  Println("Spawn Child");
+
+  pid_t pid = fork();
+  if (pid < 0) {
+    fprintf(stderr, "unable to create a fork");
+    return;
+  }
+  if (pid == 0) {
+    Println("Executing %s", *argv);
+    execv(argv[0], argv);
+    perror("execv failed to child");
+    exit(1);
+  }
+  haka->childCount++;
+
+  eventHandlerEpilogue(haka);
+}
+
 void openFile(struct hakaContext *haka) {
   contextCheck(haka);
 
@@ -287,6 +312,10 @@ void getPrimarySelection(struct hakaContext *haka, FILE **fp) {
     perror("popen error.");
     exit(1);
   }
+}
+
+void getNotesFile(struct hakaContext *haka, char fileName[BUFSIZE * 2]) {
+  strcpy(fileName, haka->notesFile);
 }
 
 int openNotesFile(struct hakaContext *haka) {

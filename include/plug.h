@@ -7,6 +7,7 @@
 #include <stdlib.h>
 
 #define HAKA_ABI_VERSION 0x1
+#define BUFSIZE 1024
 
 extern struct coreApi* api;
 
@@ -23,6 +24,8 @@ struct coreApi {
                 int keyToBind,
                 ...);
 
+  void   (*spawnChild)(struct hakaContext *, char *argv[]);
+  void   (*getNotesFile)(struct hakaContext*, char fileName[BUFSIZE * 2]);
   void   (*switchFile)(struct hakaContext *);
   void   (*getPrimarySelection)(struct hakaContext*, FILE**);
   int    (*openNotesFile)(struct hakaContext*);

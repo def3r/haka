@@ -1,7 +1,8 @@
-include ../config.mk
+# include ../config.mk
 
 .PHONY: all clean
 
+CFLAGS_SO := -fPIC -Wall -Wextra -I../include/ -shared
 SUBDIRS := $(wildcard */)
 SRC := $(wildcard *.c)
 SO  := $(SRC:.c=.so)

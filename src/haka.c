@@ -44,6 +44,8 @@ int main() {
 
       .addKeyBind = addKeyBind,
 
+      .spawnChild = spawnChild,
+      .getNotesFile = getNotesFile,
       .switchFile = switchFile,
       .getPrimarySelection = getPrimarySelection,
       .openNotesFile = openNotesFile,

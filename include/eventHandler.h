@@ -55,7 +55,9 @@ void writeTextToFile(struct hakaContext* haka, char* prefix, char* suffix);
 
 // Event Handler Helper Functions
 void getPrimarySelection(struct hakaContext* haka, FILE** fp);
+void getNotesFile(struct hakaContext* haka, char fileName[BUFSIZE * 2]);
 int openNotesFile(struct hakaContext* haka);
+void spawnChild(struct hakaContext*, char* argv[]);
 int closeNotesFile(struct hakaContext* haka);
 size_t writeFP2FD(struct hakaContext* haka);
 void triggerTofi(struct hakaContext* haka, FILE** fp);
