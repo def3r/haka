@@ -7,10 +7,10 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "core.h"
+#include "eventHandler.h"
 #include "haka.h"
-#include "hakaBase.h"
-#include "hakaEventHandler.h"
-#include "hakaUtils.h"
+#include "utils.h"
 
 struct keyBindings *initKeyBindings(int size) {
   if (size < 0) {
@@ -34,6 +34,19 @@ struct keyBindings *initKeyBindings(int size) {
   }
 
   return kbinds;
+}
+
+void freeKeyBindings(struct keyBindings **kbinds) {
+  if (kbinds == NULL || *kbinds == NULL) {
+    return;
+  }
+
+  for (int i = 0; i < (*kbinds)->size; i++) {
+    freeIntSet(&(*kbinds)->kbind[i].keys);
+  }
+  free((*kbinds)->kbind);
+  free(*kbinds);
+  *kbinds = NULL;
 }
 
 void addKeyBind(struct keyBindings *kbinds, void (*func)(struct hakaContext *),
@@ -87,17 +100,19 @@ void pushKeyBind(struct keyBindings *kbinds, struct keyBinding *kbind) {
       (struct keyBinding){.keys = kbind->keys, .func = kbind->func};
 }
 
-void executeKeyBind(struct keyBindings *kbinds, struct keyState *ks,
-                    struct hakaContext *haka) {
+int executeKeyBind(struct keyBindings *kbinds, struct keyState *ks,
+                   struct hakaContext *haka) {
+  int retval = FAIL;
   if (kbinds == 0) {
     Fprintln(stderr, "keybinds are null; abort executing a keybind");
-    return;
+    return retval;
   }
   if (ks == 0) {
     Fprintln(stderr, "keystatus is null; abort executing a keybind");
-    return;
+    return retval;
   }
 
+  retval++;
   haka->served = false;
   for (int i = 0; i < kbinds->size; i++) {
     struct keyBinding kbind = kbinds->kbind[i];
@@ -108,7 +123,12 @@ void executeKeyBind(struct keyBindings *kbinds, struct keyState *ks,
     if (j != keys->size)
       continue;
 
-    kbind.func(haka);
+    if (kbind.func == NULL) {
+      retval = RELOAD;
+    } else {
+      kbind.func(haka);
+      eventHandlerEpilogue(haka);
+    }
 
     // Issue: After Tofi launches, haka waits for it to return
     // sometimes the KeyUp events are missed by haka resulting
@@ -121,8 +141,9 @@ void executeKeyBind(struct keyBindings *kbinds, struct keyState *ks,
       ks->keyPress[keys->set[j]] = false;
     for (int i = 0; i < ks->activationCombo->size; i++)
       ks->keyPress[ks->activationCombo->set[i]] = false;
-    return;
+    return retval;
   }
+  return retval;
 }
 
 void switchFile(struct hakaContext *haka) {
@@ -132,7 +153,7 @@ void switchFile(struct hakaContext *haka) {
   printf("Launching tofi\n");
   printf("tofi.cfg path: %s\n", haka->config->tofiCfg);
 
-  triggerTofi(haka);
+  triggerTofi(haka, &haka->fp);
 
   char buf[BUFSIZE];
   bool selection = false;
@@ -152,13 +173,37 @@ void switchFile(struct hakaContext *haka) {
   eventHandlerEpilogue(haka);
 }
 
-void writeToFile(struct hakaContext *haka) {
+void sendTextToFile(struct hakaContext *haka, char *text) {
+  openNotesFile(haka);
+  if (text != NULL) {
+    write(haka->fdNotesFile, text, strlen(text));
+  }
+  closeNotesFile(haka);
+}
+
+void writeTextToFile(struct hakaContext *haka, char *prefix, char *suffix) {
+  contextCheck(haka);
+
+  openNotesFile(haka);
+  if (prefix != NULL) {
+    write(haka->fdNotesFile, prefix, strlen(prefix));
+  }
+  writeSelectionToFile(haka);
+  openNotesFile(haka);
+  if (suffix != NULL) {
+    write(haka->fdNotesFile, suffix, strlen(suffix));
+  }
+
+  eventHandlerEpilogue(haka);
+}
+
+void writeSelectionToFile(struct hakaContext *haka) {
   contextCheck(haka);
 
   printf("CTRL + ALT + C detected!\n");
   printf("Dispatching request to get primary selection\n");
 
-  getPrimarySelection(haka);
+  getPrimarySelection(haka, &haka->fp);
   openNotesFile(haka);
 
   writeFP2FD(haka);
@@ -167,19 +212,35 @@ void writeToFile(struct hakaContext *haka) {
 }
 
 void writePointToFile(struct hakaContext *haka) {
-  contextCheck(haka);
+  // contextCheck(haka);
+  //
+  // printf("CTRL + ALT + ` detected!\n");
+  // printf("Dispatching request to get primary selection\n");
+  //
+  // getPrimarySelection(haka);
+  // openNotesFile(haka);
+  //
+  // write(haka->fdNotesFile, "- ", 2);
+  //
+  // writeFP2FD(haka);
+  //
+  // eventHandlerEpilogue(haka);
+}
 
-  printf("CTRL + ALT + P detected!\n");
-  printf("Dispatching request to get primary selection\n");
-
-  getPrimarySelection(haka);
-  openNotesFile(haka);
-
-  write(haka->fdNotesFile, "- ", 2);
-
-  writeFP2FD(haka);
-
-  eventHandlerEpilogue(haka);
+void writeSubPointToFile(struct hakaContext *haka) {
+  // contextCheck(haka);
+  //
+  // Fprintln(stdout, "CTRL + ALT + S detected!");
+  // Fprintln(stdout, "Dispatching request to get primary selection");
+  //
+  // getPrimarySelection(haka);
+  // openNotesFile(haka);
+  //
+  // write(haka->fdNotesFile, "  - ", 4);
+  //
+  // writeFP2FD(haka);
+  //
+  // eventHandlerEpilogue(haka);
 }
 
 void openFile(struct hakaContext *haka) {
@@ -207,24 +268,25 @@ void openFile(struct hakaContext *haka) {
 }
 
 void sendNewlineToFile(struct hakaContext *haka) {
-  contextCheck(haka);
-
-  openNotesFile(haka);
-  write(haka->fdNotesFile, "\n", 1);
-  closeNotesFile(haka);
-
-  eventHandlerEpilogue(haka);
+  // contextCheck(haka);
+  //
+  // openNotesFile(haka);
+  // write(haka->fdNotesFile, "\n", 1);
+  // closeNotesFile(haka);
+  //
+  // eventHandlerEpilogue(haka);
 }
 
-FILE *getPrimarySelection(struct hakaContext *haka) {
+void getPrimarySelection(struct hakaContext *haka, FILE **fp) {
   contextCheck(haka);
+  if (fp == NULL)
+    return;
 
-  haka->fp = popen("wl-paste -p", "r");
-  if (haka->fp == NULL) {
+  *fp = popen("wl-paste -p", "r");
+  if (*fp == NULL) {
     perror("popen error.");
     exit(1);
   }
-  return haka->fp;
 }
 
 int openNotesFile(struct hakaContext *haka) {
@@ -262,8 +324,11 @@ size_t writeFP2FD(struct hakaContext *haka) {
   return bytes;
 }
 
-FILE *triggerTofi(struct hakaContext *haka) {
+void triggerTofi(struct hakaContext *haka, FILE **fp) {
   contextCheck(haka);
+  if (fp == NULL) {
+    return;
+  }
 
   char cmd[BUFSIZE * 2], basecmd[BUFSIZE * 2];
   snprintf(basecmd, BUFSIZE * 2, "ls %s -Ap1 | grep -v / | tofi -c %s",
@@ -274,11 +339,17 @@ FILE *triggerTofi(struct hakaContext *haka) {
            basecmd, haka->notesFileName);
   printf("Executing: %s\n", cmd);
 
-  haka->fp = popen(cmd, "r");
-  if (haka->fp == NULL) {
+  *fp = popen(cmd, "r");
+  if (*fp == NULL) {
     perror("popen error.");
     exit(1);
   }
+}
 
-  return haka->fp;
+struct coreApi *initCoreApi() {
+  struct coreApi *api = malloc(sizeof(struct coreApi));
+
+  api->sendTextToFile = sendTextToFile;
+
+  return api;
 }

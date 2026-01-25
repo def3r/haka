@@ -10,8 +10,8 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#include "hakaBase.h"
-#include "hakaUtils.h"
+#include "core.h"
+#include "utils.h"
 
 static volatile sig_atomic_t live = true;
 static void handler(int signum) {

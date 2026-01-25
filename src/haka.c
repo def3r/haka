@@ -1,3 +1,4 @@
+#include <dlfcn.h>
 #include <errno.h>
 #include <linux/input-event-codes.h>
 #include <signal.h>
@@ -10,10 +11,11 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include "core.h"
+#include "eventHandler.h"
 #include "haka.h"
-#include "hakaBase.h"
-#include "hakaEventHandler.h"
-#include "hakaUtils.h"
+#include "plug.h"
+#include "utils.h"
 
 int main() {
   // Need to disable full buffering and switch to
@@ -37,8 +39,30 @@ int main() {
   struct keyBindings *kbinds = initKeyBindings(2);
   // clang-format on
 
+  struct coreApi api = {
+      .ver = HAKA_ABI_VERSION,
+
+      .addKeyBind = addKeyBind,
+
+      .switchFile = switchFile,
+      .getPrimarySelection = getPrimarySelection,
+      .openNotesFile = openNotesFile,
+      .writeFP2FD = writeFP2FD,
+      .closeNotesFile = closeNotesFile,
+      .writeTextToFile = writeTextToFile,
+      .writeSelectionToFile = writeSelectionToFile,
+
+      .openFile = openFile,
+
+      .sendTextToFile = sendTextToFile,
+      .triggerTofi = triggerTofi,
+  };
+
+  struct PluginVector *plugins;
+  MakeVector(PluginVector, plugins);
+
   // Load Key Binds (./bindings.c)
-  loadBindings(kbinds, ks);
+  loadBindings(&kbinds, ks, &api, &plugins);
 
   gid_t curGrp;
   switchGrp(&curGrp, "input");
@@ -85,7 +109,9 @@ int main() {
         handleKeyEvent(ks, ev.code, ev.value);
 
         if (activated(ks)) {
-          executeKeyBind(kbinds, ks, haka);
+          if (executeKeyBind(kbinds, ks, haka) == RELOAD) {
+            loadBindings(&kbinds, ks, &api, &plugins);
+          }
         }
 
         if (haka->childCount > 0) {
@@ -100,7 +126,7 @@ int main() {
     libevdev_free(devs[i]);
     close(fds[i]);
   }
-  free(set);
+  freeIntSet(&set);
   free(haka->config);
   free(haka);
 
@@ -108,9 +134,7 @@ int main() {
   free(ks->activationCombo);
   free(ks);
 
-  free(kbinds->kbind->keys);
-  free(kbinds->kbind);
-  free(kbinds);
+  freeKeyBindings(&kbinds);
   Println("Clean up complete");
 
   return 0;

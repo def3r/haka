@@ -3,13 +3,23 @@
 
 #include <stdio.h>
 
+#include "core.h"
 #include "haka.h"
-#include "hakaBase.h"
-#include "hakaUtils.h"
+#include "plug.h"
+#include "utils.h"
+
+// clang-format off
+#define OK      0
+#define RELOAD  1
+#define FAIL   -1
+
+typedef int  (*pluginInit_t)(const struct coreApi*, const struct keyBindings*);
+typedef void (*hakaHook_t)(struct hakaContext*);
+// clang-format on
 
 struct keyBinding {
   struct IntSet* keys;
-  void (*func)(struct hakaContext*);
+  hakaHook_t func;
 };
 
 struct keyBindings {
@@ -19,30 +29,38 @@ struct keyBindings {
 };
 
 struct keyBindings* initKeyBindings(int size);
+void freeKeyBindings(struct keyBindings** kbinds);
 void addKeyBind(struct keyBindings* kbinds,
                 void (*func)(struct hakaContext*),
                 int keyToBind,
                 ...);
 void pushKeyBind(struct keyBindings* kbinds, struct keyBinding* kbind);
-void executeKeyBind(struct keyBindings* kbinds,
-                    struct keyState* ks,
-                    struct hakaContext* haka);
-void loadBindings(struct keyBindings* kbinds, struct keyState* ks);
+int executeKeyBind(struct keyBindings* kbinds,
+                   struct keyState* ks,
+                   struct hakaContext* haka);
+void loadBindings(struct keyBindings** kbinds,
+                  struct keyState* ks,
+                  struct coreApi* api,
+                  struct PluginVector** plugins);
 
 // Event Handler Declarations
 void switchFile(struct hakaContext* haka);
-void writeToFile(struct hakaContext* haka);
+void writeSelectionToFile(struct hakaContext* haka);
 void writePointToFile(struct hakaContext* haka);
+void writeSubPointToFile(struct hakaContext* haka);
 void openFile(struct hakaContext* haka);
 void sendNewlineToFile(struct hakaContext* haka);
+void sendTextToFile(struct hakaContext* haka, char* text);
+void writeTextToFile(struct hakaContext* haka, char* prefix, char* suffix);
 
 // Event Handler Helper Functions
-FILE* getPrimarySelection(struct hakaContext* haka);
+void getPrimarySelection(struct hakaContext* haka, FILE** fp);
 int openNotesFile(struct hakaContext* haka);
 int closeNotesFile(struct hakaContext* haka);
 size_t writeFP2FD(struct hakaContext* haka);
-FILE* triggerTofi(struct hakaContext* haka);
+void triggerTofi(struct hakaContext* haka, FILE** fp);
 
+#undef Bind
 #define Bind(func, ...) addKeyBind(kbinds, func, __VA_ARGS__, 0)
 
 #define updatePrevFile(haka)                                                   \

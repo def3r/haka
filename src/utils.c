@@ -8,8 +8,8 @@
 
 #include <libevdev/libevdev.h>
 
-#include "hakaBase.h"
-#include "hakaUtils.h"
+#include "core.h"
+#include "utils.h"
 
 struct IntSet *initIntSet(int capacity) {
   struct IntSet *set = (struct IntSet *)malloc(sizeof(struct IntSet));
@@ -23,6 +23,16 @@ struct IntSet *initIntSet(int capacity) {
   set->set = (int *)malloc(sizeof(int) * capacity);
 
   return set;
+}
+
+void freeIntSet(struct IntSet **set) {
+  if (set == NULL || *set == NULL) {
+    return;
+  }
+
+  free((*set)->set);
+  free(*set);
+  *set = NULL;
 }
 
 int pushIntSet(struct IntSet *set, int val) {
