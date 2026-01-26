@@ -10,7 +10,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#include "core.h"
+#include "base.h"
 #include "utils.h"
 
 static volatile sig_atomic_t live = true;

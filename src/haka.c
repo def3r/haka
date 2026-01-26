@@ -11,8 +11,9 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include "base.h"
+#include "binds.h"
 #include "core.h"
-#include "eventHandler.h"
 #include "haka.h"
 #include "plug.h"
 #include "utils.h"

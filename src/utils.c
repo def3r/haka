@@ -8,7 +8,7 @@
 
 #include <libevdev/libevdev.h>
 
-#include "core.h"
+#include "base.h"
 #include "utils.h"
 
 struct IntSet *initIntSet(int capacity) {

@@ -38,8 +38,7 @@ struct coreApi {
 
   void   (*openFile)(struct hakaContext *);
 
-  void   (*sendTextToFile)(struct hakaContext *,
-                           char *text);
+  void   (*sendTextToFile)(struct hakaContext *, char *text);
   void   (*triggerTofi)(struct hakaContext *, FILE**);
 };
 // clang-format on
@@ -60,7 +59,9 @@ int hakaPluginInit(struct coreApi* capi, struct keyBindings* kbinds);
     }                                                      \
   } while (0)
 
+#ifndef Bind
 #define Bind(func, ...) api->addKeyBind(kbinds, func, __VA_ARGS__, 0)
+#endif
 
 #define BEGIN_BIND                                                           \
   int hakaPluginInit(struct coreApi* capi, struct keyBindings* kbinds) {     \

@@ -7,14 +7,6 @@
 
 #include <libevdev/libevdev.h>
 
-#include "core.h"
-
-struct IntSet {
-  int* set;
-  int size;
-  int capacity;
-};
-
 typedef struct PluginVector {
   int size;
   int capacity;
@@ -59,6 +51,12 @@ typedef struct PluginVector {
       }                                 \
     }                                   \
   }
+
+struct IntSet {
+  int* set;
+  int size;
+  int capacity;
+};
 
 struct IntSet* initIntSet(int capacity);
 void freeIntSet(struct IntSet** set);
