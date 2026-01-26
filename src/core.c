@@ -9,8 +9,8 @@
 
 #include "core.h"
 #include "haka.h"
+#include "plug.h"
 #include "utils.h"
-
 
 void switchFile(struct hakaContext *haka) {
   contextCheck(haka);
@@ -108,20 +108,24 @@ void openFile(struct hakaContext *haka) {
   printf("CTRL + ALT + O detected!\n");
   printf("Opening current note in editor\n");
 
-  pid_t pid = fork();
-  if (pid < 0) {
-    fprintf(stderr, "unable to create a fork");
-    return;
-  }
-  if (pid == 0) {
-    printf("Executing %s %s -e %s %s\n", haka->config->terminal,
-           haka->config->terminal, haka->config->editor, haka->notesFile);
-    execlp(haka->config->terminal, haka->config->terminal, "-e",
-           haka->config->editor, haka->notesFile, NULL);
-    perror("execlp failed to launch note");
-    exit(1);
-  }
-  haka->childCount++;
+  // printf("Executing %s %s -e %s %s\n", haka->config->terminal,
+  //        haka->config->terminal, haka->config->editor, haka->notesFile);
+  // execlp(haka->config->terminal, haka->config->terminal, "-e",
+  //        haka->config->editor, haka->notesFile, NULL);
+  CharVector *argv;
+  MakeVector(CharVector, argv);
+  char *arg;
+  ForEach(haka->config->termargv, arg) { VectorPush(argv, arg); }
+  ForEach(haka->config->argv, arg) { VectorPush(argv, arg); }
+  VectorPush(argv, haka->notesFile);
+  VectorPush(argv, NULL);
+
+  printf("Executing: ");
+  ForEach(argv, arg) { printf("%s ", arg); }
+  spawnChild(haka, (char **)argv->arr);
+  // perror("execlp failed to launch note");
+  // exit(1);
+  // haka->childCount++;
 
   eventHandlerEpilogue(haka);
 }

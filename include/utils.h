@@ -13,6 +13,12 @@ typedef struct PluginVector {
   void** arr;
 } PluginVector;
 
+typedef struct CharVector {
+  int size;
+  int capacity;
+  void** arr;
+} CharVector;
+
 #define MakeVector(vType, v)       \
   do {                             \
     v = malloc(sizeof(vType));     \
@@ -51,6 +57,10 @@ typedef struct PluginVector {
       }                                 \
     }                                   \
   }
+
+#define VectorCopy(vDest, vSrc) memcpy(vDest, vSrc, sizeof(*vSrc));
+
+#define ForEach(v, c) for (int i = 0; i < v->size && (c = v->arr[i]); i++)
 
 struct IntSet {
   int* set;

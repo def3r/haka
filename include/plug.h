@@ -1,5 +1,5 @@
-#ifndef _PLUG_H
-#define _PLUG_H
+#ifndef HAKA_PLUG_H_
+#define HAKA_PLUG_H_
 
 #include <linux/input-event-codes.h>
 #include <stddef.h>
@@ -59,9 +59,10 @@ int hakaPluginInit(struct coreApi* capi, struct keyBindings* kbinds);
     }                                                      \
   } while (0)
 
-#ifndef Bind
+// clang-format off
+#undef Bind
 #define Bind(func, ...) api->addKeyBind(kbinds, func, __VA_ARGS__, 0)
-#endif
+// clang-format on
 
 #define BEGIN_BIND                                                           \
   int hakaPluginInit(struct coreApi* capi, struct keyBindings* kbinds) {     \
@@ -77,4 +78,4 @@ int hakaPluginInit(struct coreApi* capi, struct keyBindings* kbinds);
   return 0;      \
   }
 
-#endif  // !_PLUG_H
+#endif  // !HAKA_PLUG_H_

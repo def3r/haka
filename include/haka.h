@@ -19,6 +19,8 @@ static void handler(int signum) {
 }
 
 struct confVars {
+  CharVector* argv;
+  CharVector* termargv;
   char editor[BUFSIZE];
   char notesDir[BUFSIZE];
   char terminal[BUFSIZE];

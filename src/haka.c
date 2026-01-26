@@ -241,28 +241,119 @@ int parseConf(struct confVars *conf, char *line) {
   var = trim(var);
   val = trim(val);
 
-  if (strlen(val) >= 3 && val[0] == '$' && val[1] == '(' &&
-      val[strlen(val) - 1] == ')') {
-    val = val + 2;
-    val[strlen(val) - 1] = '\0';
-    FILE *sh = popen(val, "r");
-    if (sh == NULL) {
-      perror("Unable to popen: ");
-      exit(1);
+  char *arg;
+  struct CharVector *argv;
+  MakeVector(CharVector, argv);
+
+  while (strlen(val)) {
+    char *word = val;
+    for (; *word != '\0' && *word != ' ' && *word != '\t'; word++)
+      ;
+    if (*word == '\0') {
+      // We have reached the end of line
+      arg = (char *)calloc(strlen(val) + 1, sizeof(char));
+      strcat(arg, val);
+      VectorPush(argv, arg);
+      break;
+    }
+    char *begin = NULL;
+    char charAt = *word;
+    *word = '\0';
+
+    if (strlen(val) == 0) {
+      val = word + 1;
+      continue;
     }
 
-    strcpy(val, "");
-    char res[BUFSIZE];
-    while (fgets(res, BUFSIZE, sh)) {
-      res[strcspn(res, "\n")] = '\0';
-      strcat(val, res);
+    // if (strlen(val) >= 3 && val[0] == '$' && val[1] == '('
+    //     /* &&  val[strlen(val) - 1] == ')' */) {
+
+    // Fuck escape chars /
+    if ((begin = strstr(val, "$(")) != NULL) {
+      // We have $( in the val, find the ')'
+      *word = charAt;
+      int bop = 1;
+      word = begin + 2;
+      for (word++; *word != '\0' && !(*word == ')' && bop == 1); word++) {
+        bop += (*word == '(') - (*word == ')');
+      }
+      if (*word == '\0') {
+        Fprintln(stderr, "%s: Invalid syntax for $(): Missing ')'", var);
+        return 1;
+      }
+      *word = '\0';
+      *begin = '\0';
+
+      begin += 2;
+      FILE *sh = popen(begin, "r");
+      if (sh == NULL) {
+        perror("Unable to popen: ");
+        exit(1);
+      }
+
+      arg = (char *)calloc(BUFSIZE, sizeof(char));
+      strcat(arg, val);
+
+      char res[BUFSIZE];
+      if (fgets(res, BUFSIZE, sh)) {
+        res[strcspn(res, "\n")] = '\0';
+        strcat(arg, res);
+      }
+
+      fclose(sh);
+
+      val = ++word;
+      if (*word != '"') {
+        for (; *word != '\0' && *word != ' ' && *word != '\t'; word++)
+          ;
+        if (*word == '\0') {
+          // We have reached the end of line
+          word--;
+        } else {
+          *word = '\0';
+        }
+        strcat(arg, val);
+      } else {
+        word--;
+      }
+      VectorPush(argv, arg);
+
+    } else if ((begin = strstr(val, "\"")) != NULL) {
+      *begin = '\0';
+      *word = charAt;
+      if (strlen(val)) {
+        arg = (char *)calloc(BUFSIZE, sizeof(char));
+        strcat(arg, val);
+        VectorPush(argv, arg);
+      }
+
+      begin++;
+      word = begin;
+      for (word++; *word != '\0' && !(*word == '"'); word++)
+        ;
+      if (*word == '\0') {
+        Fprintln(stderr, "%s: Missing '\"'", var);
+        return 1;
+      }
+      *word = '\0';
+
+      arg = (char *)calloc(BUFSIZE, sizeof(char));
+      strcat(arg, begin);
+      VectorPush(argv, arg);
+
+    } else {
+      arg = (char *)calloc(strlen(val) + 1, sizeof(char));
+      strcat(arg, val);
+      VectorPush(argv, arg);
     }
 
-    fclose(sh);
+    val = word + 1;
   }
 
+  VectorPush(argv, NULL);
   if (strcmp(var, "editor") == 0) {
     strcpy(conf->editor, val);
+    conf->argv = argv;
   } else if (strcmp(var, "notes-dir") == 0) {
     if (val[strlen(val) - 1] == '\\' || val[strlen(val) - 1] == '/') {
       val[strlen(val) - 1] = '\0';
@@ -278,7 +369,11 @@ int parseConf(struct confVars *conf, char *line) {
     strcpy(conf->tofiCfg, val);
   } else if (strcmp(var, "terminal") == 0) {
     strcpy(conf->terminal, val);
+    conf->termargv = argv;
   }
+
+  Println("%s [%d]:", var, argv->size);
+  ForEach(argv, arg) { Println("Arg: %s", arg); }
 
   return 0;
 }
@@ -286,6 +381,8 @@ int parseConf(struct confVars *conf, char *line) {
 struct confVars *initConf(struct hakaContext *haka) {
   haka->config = (struct confVars *)malloc(sizeof(struct confVars));
   struct confVars *conf = haka->config;
+
+  MakeVector(CharVector, conf->argv);
 
   strcpy(conf->editor, "/usr/bin/nvim");
   strCpyCat(conf->notesDir, haka->execDir, "/notes");
