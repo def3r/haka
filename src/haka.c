@@ -219,36 +219,10 @@ bool activated(struct keyState *ks) {
   return true;
 }
 
-int parseConf(struct confVars *conf, char *line) {
-  if (line == NULL || conf == NULL) {
-    return -1;
-  }
-
-  line = trim(line);
-  if (line[0] == '#')
-    return 0;
-
-  char *c = line;
-  for (; *c != '\0' && *c != '='; c++)
-    ;
-  if (*c != '=') {
-    return 1;
-  }
-
-  *c = '\0';
-  char *var = line;
-  char *val = ++c;
-  var = trim(var);
-  val = trim(val);
-
-  char *arg;
-  struct CharVector *argv;
-  MakeVector(CharVector, argv);
-
+int parseConfVal(char *var, char *val, char *arg, struct CharVector *argv) {
   while (strlen(val)) {
     char *word = val;
-    for (; *word != '\0' && *word != ' ' && *word != '\t'; word++)
-      ;
+    NextWord(word);
     if (*word == '\0') {
       // We have reached the end of line
       arg = (char *)calloc(strlen(val) + 1, sizeof(char));
@@ -265,15 +239,13 @@ int parseConf(struct confVars *conf, char *line) {
       continue;
     }
 
-    // if (strlen(val) >= 3 && val[0] == '$' && val[1] == '('
-    //     /* &&  val[strlen(val) - 1] == ')' */) {
+    // TODO: escape chars \
 
-    // Fuck escape chars /
     if ((begin = strstr(val, "$(")) != NULL) {
       // We have $( in the val, find the ')'
       *word = charAt;
-      int bop = 1;
       word = begin + 2;
+      int bop = 1;
       for (word++; *word != '\0' && !(*word == ')' && bop == 1); word++) {
         bop += (*word == '(') - (*word == ')');
       }
@@ -304,8 +276,7 @@ int parseConf(struct confVars *conf, char *line) {
 
       val = ++word;
       if (*word != '"') {
-        for (; *word != '\0' && *word != ' ' && *word != '\t'; word++)
-          ;
+        NextWord(word);
         if (*word == '\0') {
           // We have reached the end of line
           word--;
@@ -350,10 +321,46 @@ int parseConf(struct confVars *conf, char *line) {
     val = word + 1;
   }
 
+  return 0;
+}
+
+int parseConf(struct confVars *conf, char *line) {
+  if (line == NULL || conf == NULL) {
+    return -1;
+  }
+
+  line = trim(line);
+  if (line[0] == '#')
+    return 0;
+
+  char *c = line;
+  for (; *c != '\0' && *c != '='; c++)
+    ;
+  if (*c != '=') {
+    return 1;
+  }
+
+  *c = '\0';
+  char *var = line;
+  char *val = ++c;
+  var = trim(var);
+  val = trim(val);
+
+  char *arg;
+  struct CharVector *argv;
+  MakeVector(CharVector, argv);
+
+  if (parseConfVal(var, val, arg, argv)) {
+    FreeVector(argv);
+    return 1;
+  }
+
   VectorPush(argv, NULL);
   if (strcmp(var, "editor") == 0) {
-    strcpy(conf->editor, val);
-    conf->argv = argv;
+    if (conf->editor != NULL) {
+      FreeVector(conf->editor);
+    }
+    conf->editor = argv;
   } else if (strcmp(var, "notes-dir") == 0) {
     if (val[strlen(val) - 1] == '\\' || val[strlen(val) - 1] == '/') {
       val[strlen(val) - 1] = '\0';
@@ -368,8 +375,10 @@ int parseConf(struct confVars *conf, char *line) {
   } else if (strcmp(var, "tofi-cfg") == 0) {
     strcpy(conf->tofiCfg, val);
   } else if (strcmp(var, "terminal") == 0) {
-    strcpy(conf->terminal, val);
-    conf->termargv = argv;
+    if (conf->terminal != NULL) {
+      FreeVector(conf->terminal);
+    }
+    conf->terminal = argv;
   }
 
   Println("%s [%d]:", var, argv->size);
@@ -382,9 +391,9 @@ struct confVars *initConf(struct hakaContext *haka) {
   haka->config = (struct confVars *)malloc(sizeof(struct confVars));
   struct confVars *conf = haka->config;
 
-  MakeVector(CharVector, conf->argv);
+  MakeVector(CharVector, conf->editor);
 
-  strcpy(conf->editor, "/usr/bin/nvim");
+  VectorPush(conf->editor, "/usr/bin/nvim");
   strCpyCat(conf->notesDir, haka->execDir, "/notes");
   strCpyCat(conf->tofiCfg, haka->execDir, "/tofi.cfg");
 
@@ -394,9 +403,9 @@ struct confVars *initConf(struct hakaContext *haka) {
   }
   if (strcmp(term, "") == 0) {
     fprintf(stderr, "Cannot get var $TERM, recieved '%s'\n", term);
-    strcpy(conf->terminal, "alacritty");
+    VectorPush(conf->terminal, "alacritty");
   } else {
-    strcpy(conf->terminal, term);
+    VectorPush(conf->terminal, term);
   }
 
   char configFile[BUFSIZE];

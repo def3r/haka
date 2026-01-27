@@ -19,11 +19,9 @@ static void handler(int signum) {
 }
 
 struct confVars {
-  CharVector* argv;
-  CharVector* termargv;
-  char editor[BUFSIZE];
+  CharVector* editor;
+  CharVector* terminal;
   char notesDir[BUFSIZE];
-  char terminal[BUFSIZE];
   char tofiCfg[BUFSIZE];
 };
 
@@ -74,5 +72,8 @@ void reapChild(struct hakaContext* haka);
 #define buildAbsFilePath(haka)                                            \
   snprintf(haka->notesFile, BUFSIZE * 2, "%s/%s", haka->config->notesDir, \
            haka->notesFileName);
+
+#define NextWord(word) \
+  for (; *word != '\0' && *word != ' ' && *word != '\t'; word++)
 
 #endif

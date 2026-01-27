@@ -105,27 +105,22 @@ void spawnChild(struct hakaContext *haka, char *argv[]) {
 void openFile(struct hakaContext *haka) {
   contextCheck(haka);
 
-  printf("CTRL + ALT + O detected!\n");
   printf("Opening current note in editor\n");
 
-  // printf("Executing %s %s -e %s %s\n", haka->config->terminal,
-  //        haka->config->terminal, haka->config->editor, haka->notesFile);
-  // execlp(haka->config->terminal, haka->config->terminal, "-e",
-  //        haka->config->editor, haka->notesFile, NULL);
   CharVector *argv;
-  MakeVector(CharVector, argv);
   char *arg;
-  ForEach(haka->config->termargv, arg) { VectorPush(argv, arg); }
-  ForEach(haka->config->argv, arg) { VectorPush(argv, arg); }
+  MakeVector(CharVector, argv);
+  ForEach(haka->config->terminal, arg) { VectorPush(argv, arg); }
+  ForEach(haka->config->editor, arg) { VectorPush(argv, arg); }
   VectorPush(argv, haka->notesFile);
   VectorPush(argv, NULL);
 
   printf("Executing: ");
   ForEach(argv, arg) { printf("%s ", arg); }
+  printf("\n");
   spawnChild(haka, (char **)argv->arr);
-  // perror("execlp failed to launch note");
-  // exit(1);
-  // haka->childCount++;
+
+  FreeVector(argv);
 
   eventHandlerEpilogue(haka);
 }

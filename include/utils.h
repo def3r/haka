@@ -27,6 +27,7 @@ typedef struct CharVector {
     }                              \
   } while (0)
 
+// TODO: This is not hard Free
 #define FreeVector(v) \
   if (v != NULL) {    \
     free(v->arr);     \
