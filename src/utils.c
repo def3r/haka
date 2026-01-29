@@ -1,4 +1,5 @@
 #include <dirent.h>
+#include <dlfcn.h>
 #include <fcntl.h>
 #include <grp.h>
 #include <stdio.h>
@@ -8,8 +9,8 @@
 
 #include <libevdev/libevdev.h>
 
-#include "hakaBase.h"
-#include "hakaUtils.h"
+#include "base.h"
+#include "utils.h"
 
 struct IntSet *initIntSet(int capacity) {
   struct IntSet *set = (struct IntSet *)malloc(sizeof(struct IntSet));
@@ -23,6 +24,16 @@ struct IntSet *initIntSet(int capacity) {
   set->set = (int *)malloc(sizeof(int) * capacity);
 
   return set;
+}
+
+void freeIntSet(struct IntSet **set) {
+  if (set == NULL || *set == NULL) {
+    return;
+  }
+
+  free((*set)->set);
+  free(*set);
+  *set = NULL;
 }
 
 int pushIntSet(struct IntSet *set, int val) {
@@ -239,4 +250,25 @@ char *rtrim(char *s) {
 char *trim(char *s) {
   s = ltrim(s);
   return rtrim(s);
+}
+
+void freePlugins(struct PluginVector **plugins) {
+  for (int i = 0; i < (*plugins)->size; i++) {
+    dlclose((*plugins)->arr[i]);
+  }
+  FreeVector((*plugins));
+}
+
+char *expandValidDir(char *val) {
+  if (val[strlen(val) - 1] == '\\' || val[strlen(val) - 1] == '/') {
+    val[strlen(val) - 1] = '\0';
+  }
+  if (val[0] == '~' && (val[1] == '/' || val[1] == '\\')) {
+    char *home = getEnvVar("$HOME");
+    val = val + 1;
+    strcat(home, val);
+    val = home;
+  }
+
+  return val;
 }

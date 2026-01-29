@@ -1,3 +1,4 @@
+#include <dlfcn.h>
 #include <errno.h>
 #include <linux/input-event-codes.h>
 #include <signal.h>
@@ -10,10 +11,12 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include "base.h"
+#include "binds.h"
+#include "core.h"
 #include "haka.h"
-#include "hakaBase.h"
-#include "hakaEventHandler.h"
-#include "hakaUtils.h"
+#include "plug.h"
+#include "utils.h"
 
 int main() {
   // Need to disable full buffering and switch to
@@ -37,8 +40,32 @@ int main() {
   struct keyBindings *kbinds = initKeyBindings(2);
   // clang-format on
 
+  struct coreApi api = {
+      .ver = HAKA_ABI_VERSION,
+
+      .addKeyBind = addKeyBind,
+
+      .spawnChild = spawnChild,
+      .getNotesFile = getNotesFile,
+      .switchFile = switchFile,
+      .getPrimarySelection = getPrimarySelection,
+      .openNotesFile = openNotesFile,
+      .writeFP2FD = writeFP2FD,
+      .closeNotesFile = closeNotesFile,
+      .writeTextToFile = writeTextToFile,
+      .writeSelectionToFile = writeSelectionToFile,
+
+      .openFile = openFile,
+
+      .sendTextToFile = sendTextToFile,
+      .triggerTofi = triggerTofi,
+  };
+
+  struct PluginVector *plugins;
+  MakeVector(PluginVector, plugins);
+
   // Load Key Binds (./bindings.c)
-  loadBindings(kbinds, ks);
+  loadBindings(haka, &kbinds, ks, &api, &plugins);
 
   gid_t curGrp;
   switchGrp(&curGrp, "input");
@@ -85,7 +112,9 @@ int main() {
         handleKeyEvent(ks, ev.code, ev.value);
 
         if (activated(ks)) {
-          executeKeyBind(kbinds, ks, haka);
+          if (executeKeyBind(kbinds, ks, haka) == RELOAD) {
+            loadBindings(haka, &kbinds, ks, &api, &plugins);
+          }
         }
 
         if (haka->childCount > 0) {
@@ -100,7 +129,9 @@ int main() {
     libevdev_free(devs[i]);
     close(fds[i]);
   }
-  free(set);
+  freeIntSet(&set);
+  DeepFreeVector(haka->config->editor);
+  DeepFreeVector(haka->config->terminal);
   free(haka->config);
   free(haka);
 
@@ -108,9 +139,8 @@ int main() {
   free(ks->activationCombo);
   free(ks);
 
-  free(kbinds->kbind->keys);
-  free(kbinds->kbind);
-  free(kbinds);
+  freeKeyBindings(&kbinds);
+  freePlugins(&plugins);
   Println("Clean up complete");
 
   return 0;
@@ -192,6 +222,111 @@ bool activated(struct keyState *ks) {
   return true;
 }
 
+int parseConfVal(char *var, char *val, char *arg, struct CharVector *argv) {
+  while (strlen(val)) {
+    char *word = val;
+    NextWord(word);
+    if (*word == '\0') {
+      // We have reached the end of line
+      arg = (char *)calloc(strlen(val) + 1, sizeof(char));
+      strcat(arg, val);
+      VectorPush(argv, arg);
+      break;
+    }
+    char *begin = NULL;
+    char charAt = *word;
+    *word = '\0';
+
+    if (strlen(val) == 0) {
+      val = word + 1;
+      continue;
+    }
+
+    // TODO: escape chars \
+
+    if ((begin = strstr(val, "$(")) != NULL) {
+      // We have $( in the val, find the ')'
+      *word = charAt;
+      word = begin + 2;
+      int bop = 1;
+      for (word++; *word != '\0' && !(*word == ')' && bop == 1); word++) {
+        bop += (*word == '(') - (*word == ')');
+      }
+      if (*word == '\0') {
+        Fprintln(stderr, "%s: Invalid syntax for $(): Missing ')'", var);
+        return 1;
+      }
+      *word = '\0';
+      *begin = '\0';
+
+      begin += 2;
+      FILE *sh = popen(begin, "r");
+      if (sh == NULL) {
+        perror("Unable to popen: ");
+        exit(1);
+      }
+
+      arg = (char *)calloc(BUFSIZE, sizeof(char));
+      strcat(arg, val);
+
+      char res[BUFSIZE];
+      if (fgets(res, BUFSIZE, sh)) {
+        res[strcspn(res, "\n")] = '\0';
+        strcat(arg, res);
+      }
+
+      fclose(sh);
+
+      val = ++word;
+      if (*word != '"') {
+        NextWord(word);
+        if (*word == '\0') {
+          // We have reached the end of line
+          word--;
+        } else {
+          *word = '\0';
+        }
+        strcat(arg, val);
+      } else {
+        word--;
+      }
+      VectorPush(argv, arg);
+
+    } else if ((begin = strstr(val, "\"")) != NULL) {
+      *begin = '\0';
+      *word = charAt;
+      if (strlen(val)) {
+        arg = (char *)calloc(BUFSIZE, sizeof(char));
+        strcat(arg, val);
+        VectorPush(argv, arg);
+      }
+
+      begin++;
+      word = begin;
+      for (word++; *word != '\0' && !(*word == '"'); word++)
+        ;
+      if (*word == '\0') {
+        Fprintln(stderr, "%s: Missing '\"'", var);
+        return 1;
+      }
+      *word = '\0';
+
+      arg = (char *)calloc(BUFSIZE, sizeof(char));
+      strcat(arg, begin);
+      VectorPush(argv, arg);
+
+    } else {
+      arg = (char *)calloc(strlen(val) + 1, sizeof(char));
+      strcat(arg, val);
+      VectorPush(argv, arg);
+    }
+
+    val = word + 1;
+  }
+
+  return 0;
+}
+
 int parseConf(struct confVars *conf, char *line) {
   if (line == NULL || conf == NULL) {
     return -1;
@@ -214,44 +349,36 @@ int parseConf(struct confVars *conf, char *line) {
   var = trim(var);
   val = trim(val);
 
-  if (strlen(val) >= 3 && val[0] == '$' && val[1] == '(' &&
-      val[strlen(val) - 1] == ')') {
-    val = val + 2;
-    val[strlen(val) - 1] = '\0';
-    FILE *sh = popen(val, "r");
-    if (sh == NULL) {
-      perror("Unable to popen: ");
-      exit(1);
-    }
+  char *arg;
+  struct CharVector *argv;
+  MakeVector(CharVector, argv);
 
-    strcpy(val, "");
-    char res[BUFSIZE];
-    while (fgets(res, BUFSIZE, sh)) {
-      res[strcspn(res, "\n")] = '\0';
-      strcat(val, res);
-    }
-
-    fclose(sh);
+  if (parseConfVal(var, val, arg, argv)) {
+    FreeVector(argv);
+    return 1;
   }
 
+  VectorPush(argv, NULL);
   if (strcmp(var, "editor") == 0) {
-    strcpy(conf->editor, val);
+    if (conf->editor != NULL) {
+      FreeVector(conf->editor);
+    }
+    conf->editor = argv;
   } else if (strcmp(var, "notes-dir") == 0) {
-    if (val[strlen(val) - 1] == '\\' || val[strlen(val) - 1] == '/') {
-      val[strlen(val) - 1] = '\0';
-    }
-    if (val[0] == '~' && (val[1] == '/' || val[1] == '\\')) {
-      char *home = getEnvVar("$HOME");
-      var = var + 1;
-      strcat(home, val);
-      val = home;
-    }
-    strcpy(conf->notesDir, val);
+    strcpy(conf->notesDir, expandValidDir(val));
   } else if (strcmp(var, "tofi-cfg") == 0) {
-    strcpy(conf->tofiCfg, val);
+    strcpy(conf->tofiCfg, expandValidDir(val));
   } else if (strcmp(var, "terminal") == 0) {
-    strcpy(conf->terminal, val);
+    if (conf->terminal != NULL) {
+      FreeVector(conf->terminal);
+    }
+    conf->terminal = argv;
+  } else if (strcmp(var, "plugins") == 0) {
+    strcpy(conf->pluginsDir, expandValidDir(val));
   }
+
+  Println("%s [%d]:", var, argv->size);
+  ForEach(argv, arg) { Println("Arg: %s", arg); }
 
   return 0;
 }
@@ -260,26 +387,30 @@ struct confVars *initConf(struct hakaContext *haka) {
   haka->config = (struct confVars *)malloc(sizeof(struct confVars));
   struct confVars *conf = haka->config;
 
-  strcpy(conf->editor, "/usr/bin/nvim");
+  MakeVector(CharVector, conf->editor);
+  MakeVector(CharVector, conf->terminal);
+
+  VectorPush(conf->editor, "/usr/bin/nvim");
   strCpyCat(conf->notesDir, haka->execDir, "/notes");
   strCpyCat(conf->tofiCfg, haka->execDir, "/tofi.cfg");
+  strCpyCat(conf->pluginsDir, haka->execDir, "/plugins");
 
   char *term = getEnvVar("$TERM");
   if (term == NULL) {
-    fprintf(stderr, "Cannot get var $TERM, recieved NULL\n");
+    Fprintln(stderr, "Cannot get var $TERM, recieved NULL");
   }
   if (strcmp(term, "") == 0) {
-    fprintf(stderr, "Cannot get var $TERM, recieved '%s'\n", term);
-    strcpy(conf->terminal, "alacritty");
+    Fprintln(stderr, "Cannot get var $TERM, recieved '%s'", term);
+    VectorPush(conf->terminal, "alacritty");
   } else {
-    strcpy(conf->terminal, term);
+    VectorPush(conf->terminal, term);
   }
 
   char configFile[BUFSIZE];
   strCpyCat(configFile, haka->execDir, "/haka.cfg");
   FILE *file = fopen(configFile, "r");
   if (file == NULL) {
-    printf("No config file haka.cfg found in execDir: %s\n", haka->execDir);
+    Println("No config file haka.cfg found in execDir: %s", haka->execDir);
     return conf;
   }
 
@@ -315,7 +446,7 @@ struct hakaContext *initHaka() {
   haka->fp = NULL;
   haka->childCount = 0;
 
-  printf("Notes File: %ld %s\n", strlen(haka->notesFile), haka->notesFile);
+  Println("Notes File: %ld %s", strlen(haka->notesFile), haka->notesFile);
 
   // forceSudo();
   //
@@ -350,7 +481,7 @@ void getExeDir(struct hakaContext *haka) {
     exit(1);
   }
   haka->execDir[nbytes] = '\0';
-  printf("Readlink: %s\n", haka->execDir);
+  Println("Readlink: %s", haka->execDir);
 
   // Strip off the file name
   char *p = &haka->execDir[nbytes];
@@ -360,12 +491,12 @@ void getExeDir(struct hakaContext *haka) {
 
   size_t len = p - &haka->execDir[0];
   if (len <= 0) {
-    printf("Invalid path to binary %s", haka->execDir);
+    Fprintln(stderr, "Invalid path to binary %s", haka->execDir);
     exit(1);
   }
   haka->execDir[len] = '\0';
 
-  printf("Dir Path: %s\n", haka->execDir);
+  Println("Dir Path: %s", haka->execDir);
 }
 
 void getPrevFile(struct hakaContext *haka) {
@@ -390,7 +521,7 @@ void getPrevFile(struct hakaContext *haka) {
 void reapChild(struct hakaContext *haka) {
   pid_t pid;
   while ((pid = waitpid(-1, NULL, WNOHANG)) > 0) {
-    printf("Reaped child proc %d\n", pid);
+    Println("Reaped child proc %d", pid);
     haka->childCount--;
   }
 }

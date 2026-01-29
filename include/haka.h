@@ -10,8 +10,8 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#include "hakaBase.h"
-#include "hakaUtils.h"
+#include "base.h"
+#include "utils.h"
 
 static volatile sig_atomic_t live = true;
 static void handler(int signum) {
@@ -19,9 +19,10 @@ static void handler(int signum) {
 }
 
 struct confVars {
-  char editor[BUFSIZE];
+  CharVector* editor;
+  CharVector* terminal;
+  char pluginsDir[BUFSIZE];
   char notesDir[BUFSIZE];
-  char terminal[BUFSIZE];
   char tofiCfg[BUFSIZE];
 };
 
@@ -72,5 +73,8 @@ void reapChild(struct hakaContext* haka);
 #define buildAbsFilePath(haka)                                            \
   snprintf(haka->notesFile, BUFSIZE * 2, "%s/%s", haka->config->notesDir, \
            haka->notesFileName);
+
+#define NextWord(word) \
+  for (; *word != '\0' && *word != ' ' && *word != '\t'; word++)
 
 #endif
