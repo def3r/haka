@@ -65,7 +65,7 @@ int main() {
   MakeVector(PluginVector, plugins);
 
   // Load Key Binds (./bindings.c)
-  loadBindings(&kbinds, ks, &api, &plugins);
+  loadBindings(haka, &kbinds, ks, &api, &plugins);
 
   gid_t curGrp;
   switchGrp(&curGrp, "input");
@@ -113,7 +113,7 @@ int main() {
 
         if (activated(ks)) {
           if (executeKeyBind(kbinds, ks, haka) == RELOAD) {
-            loadBindings(&kbinds, ks, &api, &plugins);
+            loadBindings(haka, &kbinds, ks, &api, &plugins);
           }
         }
 
@@ -365,23 +365,16 @@ int parseConf(struct confVars *conf, char *line) {
     }
     conf->editor = argv;
   } else if (strcmp(var, "notes-dir") == 0) {
-    if (val[strlen(val) - 1] == '\\' || val[strlen(val) - 1] == '/') {
-      val[strlen(val) - 1] = '\0';
-    }
-    if (val[0] == '~' && (val[1] == '/' || val[1] == '\\')) {
-      char *home = getEnvVar("$HOME");
-      var = var + 1;
-      strcat(home, val);
-      val = home;
-    }
-    strcpy(conf->notesDir, val);
+    strcpy(conf->notesDir, expandValidDir(val));
   } else if (strcmp(var, "tofi-cfg") == 0) {
-    strcpy(conf->tofiCfg, val);
+    strcpy(conf->tofiCfg, expandValidDir(val));
   } else if (strcmp(var, "terminal") == 0) {
     if (conf->terminal != NULL) {
       FreeVector(conf->terminal);
     }
     conf->terminal = argv;
+  } else if (strcmp(var, "plugins") == 0) {
+    strcpy(conf->pluginsDir, expandValidDir(val));
   }
 
   Println("%s [%d]:", var, argv->size);
@@ -400,6 +393,7 @@ struct confVars *initConf(struct hakaContext *haka) {
   VectorPush(conf->editor, "/usr/bin/nvim");
   strCpyCat(conf->notesDir, haka->execDir, "/notes");
   strCpyCat(conf->tofiCfg, haka->execDir, "/tofi.cfg");
+  strCpyCat(conf->pluginsDir, haka->execDir, "/plugins");
 
   char *term = getEnvVar("$TERM");
   if (term == NULL) {

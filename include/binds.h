@@ -34,7 +34,8 @@ void pushKeyBind(struct keyBindings* kbinds, struct keyBinding* kbind);
 int executeKeyBind(struct keyBindings* kbinds,
                    struct keyState* ks,
                    struct hakaContext* haka);
-void loadBindings(struct keyBindings** kbinds,
+void loadBindings(struct hakaContext* haka,
+                  struct keyBindings** kbinds,
                   struct keyState* ks,
                   struct coreApi* api,
                   struct PluginVector** plugins);

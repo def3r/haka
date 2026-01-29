@@ -66,9 +66,7 @@ void writeTextToFile(struct hakaContext *haka, char *prefix, char *suffix) {
 void writeSelectionToFile(struct hakaContext *haka) {
   contextCheck(haka);
 
-  printf("CTRL + ALT + C detected!\n");
-  printf("Dispatching request to get primary selection\n");
-
+  Println("Dispatching request to get primary selection");
   getPrimarySelection(haka, &haka->fp);
   openNotesFile(haka);
 
@@ -88,7 +86,7 @@ void spawnChild(struct hakaContext *haka, char *argv[]) {
 
   pid_t pid = fork();
   if (pid < 0) {
-    fprintf(stderr, "unable to create a fork");
+    Fprintln(stderr, "unable to create a fork");
     return;
   }
   if (pid == 0) {
@@ -107,21 +105,20 @@ void openFile(struct hakaContext *haka) {
 
   printf("Opening current note in editor\n");
 
-  CharVector *argv;
+  CharVector argv = {.size = 0, .capacity = 0, .arr = NULL};
+  CharVector *argvPtr = &argv;
   char *arg;
-  MakeVector(CharVector, argv);
-  ForEach(haka->config->terminal, arg) { VectorPush(argv, arg); }
-  ForEach(haka->config->editor, arg) { VectorPush(argv, arg); }
-  VectorPush(argv, haka->notesFile);
-  VectorPush(argv, NULL);
+  ForEach(haka->config->terminal, arg) { VectorPush(argvPtr, arg); }
+  ForEach(haka->config->editor, arg) { VectorPush(argvPtr, arg); }
+  VectorPush(argvPtr, haka->notesFile);
+  VectorPush(argvPtr, NULL);
 
   printf("Executing: ");
-  ForEach(argv, arg) { printf("%s ", arg); }
+  ForEach(argvPtr, arg) { printf("%s ", arg); }
   printf("\n");
-  spawnChild(haka, (char **)argv->arr);
+  spawnChild(haka, (char **)argv.arr);
 
-  FreeVector(argv);
-
+  free(argv.arr); // Better be on stack
   eventHandlerEpilogue(haka);
 }
 

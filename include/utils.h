@@ -49,8 +49,10 @@ typedef struct CharVector {
     if (v->size == v->capacity) {                               \
       v->capacity = v->capacity == 0 ? 1 : v->capacity;         \
       void* newArr = malloc(sizeof(*v->arr) * 2 * v->capacity); \
-      memcpy(newArr, v->arr, sizeof(*v->arr) * v->size);        \
-      free(v->arr);                                             \
+      if (v->arr) {                                             \
+        memcpy(newArr, v->arr, sizeof(*v->arr) * v->size);      \
+        free(v->arr);                                           \
+      }                                                         \
       v->arr = newArr;                                          \
       v->capacity *= 2;                                         \
     }                                                           \
@@ -93,6 +95,8 @@ void switchGrp(gid_t* curGID, const char* grpnam);
 
 int getKbdEvents(struct IntSet* set);
 int openKbdDevices(struct IntSet* set, int* fds, struct libevdev* devs[]);
+
+char* expandValidDir(char* val);
 
 char* ltrim(char* s);
 char* rtrim(char* s);

@@ -21,6 +21,7 @@ static void handler(int signum) {
 struct confVars {
   CharVector* editor;
   CharVector* terminal;
+  char pluginsDir[BUFSIZE];
   char notesDir[BUFSIZE];
   char tofiCfg[BUFSIZE];
 };

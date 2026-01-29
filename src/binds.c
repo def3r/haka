@@ -73,8 +73,9 @@ static void loadPlugins(char *path, struct keyBindings *kbinds,
   closedir(dir);
 }
 
-void loadBindings(struct keyBindings **kbinds, struct keyState *ks,
-                  struct coreApi *api, struct PluginVector **plugins) {
+void loadBindings(struct hakaContext *haka, struct keyBindings **kbinds,
+                  struct keyState *ks, struct coreApi *api,
+                  struct PluginVector **plugins) {
   if (kbinds == 0 || ks == 0) {
     Fprintln(stderr, "cannot bind keys to null");
     exit(EXIT_FAILURE);
@@ -93,8 +94,7 @@ void loadBindings(struct keyBindings **kbinds, struct keyState *ks,
     ActivationCombo(KEY_LEFTCTRL, KEY_LEFTALT);
   }
 
-  // TODO: Custom config path
-  loadPlugins("./plugins", *kbinds, api, *plugins);
+  loadPlugins(haka->config->pluginsDir, *kbinds, api, *plugins);
 }
 
 struct keyBindings *initKeyBindings(int size) {

@@ -1,10 +1,10 @@
 #include <dirent.h>
+#include <dlfcn.h>
 #include <fcntl.h>
 #include <grp.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <dlfcn.h>
 #include <unistd.h>
 
 #include <libevdev/libevdev.h>
@@ -259,3 +259,16 @@ void freePlugins(struct PluginVector **plugins) {
   FreeVector((*plugins));
 }
 
+char *expandValidDir(char *val) {
+  if (val[strlen(val) - 1] == '\\' || val[strlen(val) - 1] == '/') {
+    val[strlen(val) - 1] = '\0';
+  }
+  if (val[0] == '~' && (val[1] == '/' || val[1] == '\\')) {
+    char *home = getEnvVar("$HOME");
+    val = val + 1;
+    strcat(home, val);
+    val = home;
+  }
+
+  return val;
+}
