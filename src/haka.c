@@ -130,6 +130,8 @@ int main() {
     close(fds[i]);
   }
   freeIntSet(&set);
+  DeepFreeVector(haka->config->editor);
+  DeepFreeVector(haka->config->terminal);
   free(haka->config);
   free(haka);
 
@@ -138,6 +140,7 @@ int main() {
   free(ks);
 
   freeKeyBindings(&kbinds);
+  freePlugins(&plugins);
   Println("Clean up complete");
 
   return 0;
@@ -392,6 +395,7 @@ struct confVars *initConf(struct hakaContext *haka) {
   struct confVars *conf = haka->config;
 
   MakeVector(CharVector, conf->editor);
+  MakeVector(CharVector, conf->terminal);
 
   VectorPush(conf->editor, "/usr/bin/nvim");
   strCpyCat(conf->notesDir, haka->execDir, "/notes");
@@ -399,10 +403,10 @@ struct confVars *initConf(struct hakaContext *haka) {
 
   char *term = getEnvVar("$TERM");
   if (term == NULL) {
-    fprintf(stderr, "Cannot get var $TERM, recieved NULL\n");
+    Fprintln(stderr, "Cannot get var $TERM, recieved NULL");
   }
   if (strcmp(term, "") == 0) {
-    fprintf(stderr, "Cannot get var $TERM, recieved '%s'\n", term);
+    Fprintln(stderr, "Cannot get var $TERM, recieved '%s'", term);
     VectorPush(conf->terminal, "alacritty");
   } else {
     VectorPush(conf->terminal, term);
@@ -412,7 +416,7 @@ struct confVars *initConf(struct hakaContext *haka) {
   strCpyCat(configFile, haka->execDir, "/haka.cfg");
   FILE *file = fopen(configFile, "r");
   if (file == NULL) {
-    printf("No config file haka.cfg found in execDir: %s\n", haka->execDir);
+    Println("No config file haka.cfg found in execDir: %s", haka->execDir);
     return conf;
   }
 
@@ -448,7 +452,7 @@ struct hakaContext *initHaka() {
   haka->fp = NULL;
   haka->childCount = 0;
 
-  printf("Notes File: %ld %s\n", strlen(haka->notesFile), haka->notesFile);
+  Println("Notes File: %ld %s", strlen(haka->notesFile), haka->notesFile);
 
   // forceSudo();
   //
@@ -483,7 +487,7 @@ void getExeDir(struct hakaContext *haka) {
     exit(1);
   }
   haka->execDir[nbytes] = '\0';
-  printf("Readlink: %s\n", haka->execDir);
+  Println("Readlink: %s", haka->execDir);
 
   // Strip off the file name
   char *p = &haka->execDir[nbytes];
@@ -493,12 +497,12 @@ void getExeDir(struct hakaContext *haka) {
 
   size_t len = p - &haka->execDir[0];
   if (len <= 0) {
-    printf("Invalid path to binary %s", haka->execDir);
+    Fprintln(stderr, "Invalid path to binary %s", haka->execDir);
     exit(1);
   }
   haka->execDir[len] = '\0';
 
-  printf("Dir Path: %s\n", haka->execDir);
+  Println("Dir Path: %s", haka->execDir);
 }
 
 void getPrevFile(struct hakaContext *haka) {
@@ -523,7 +527,7 @@ void getPrevFile(struct hakaContext *haka) {
 void reapChild(struct hakaContext *haka) {
   pid_t pid;
   while ((pid = waitpid(-1, NULL, WNOHANG)) > 0) {
-    printf("Reaped child proc %d\n", pid);
+    Println("Reaped child proc %d", pid);
     haka->childCount--;
   }
 }

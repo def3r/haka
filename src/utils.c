@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <dlfcn.h>
 #include <unistd.h>
 
 #include <libevdev/libevdev.h>
@@ -250,3 +251,11 @@ char *trim(char *s) {
   s = ltrim(s);
   return rtrim(s);
 }
+
+void freePlugins(struct PluginVector **plugins) {
+  for (int i = 0; i < (*plugins)->size; i++) {
+    dlclose((*plugins)->arr[i]);
+  }
+  FreeVector((*plugins));
+}
+

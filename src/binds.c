@@ -85,10 +85,7 @@ void loadBindings(struct keyBindings **kbinds, struct keyState *ks,
     freeKeyBindings(kbinds);
     *kbinds = initKeyBindings(2);
 
-    for (int i = 0; i < (*plugins)->size; i++) {
-      dlclose((*plugins)->arr[i]);
-    }
-    FreeVector((*plugins));
+    freePlugins(plugins);
     MakeVector(PluginVector, *plugins);
     Println("Done FREEing Keybinds");
   } else {
@@ -96,6 +93,7 @@ void loadBindings(struct keyBindings **kbinds, struct keyState *ks,
     ActivationCombo(KEY_LEFTCTRL, KEY_LEFTALT);
   }
 
+  // TODO: Custom config path
   loadPlugins("./plugins", *kbinds, api, *plugins);
 }
 

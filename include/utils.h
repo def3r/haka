@@ -27,12 +27,21 @@ typedef struct CharVector {
     }                              \
   } while (0)
 
-// TODO: This is not hard Free
 #define FreeVector(v) \
   if (v != NULL) {    \
     free(v->arr);     \
     free(v);          \
     v = NULL;         \
+  }
+
+#define DeepFreeVector(v)      \
+  if (v != NULL) {             \
+    while (v->size) {          \
+      free(v->arr[--v->size]); \
+    }                          \
+    free(v->arr);              \
+    free(v);                   \
+    v = NULL;                  \
   }
 
 #define VectorPush(v, c)                                        \
@@ -62,6 +71,8 @@ typedef struct CharVector {
 #define VectorCopy(vDest, vSrc) memcpy(vDest, vSrc, sizeof(*vSrc));
 
 #define ForEach(v, c) for (int i = 0; i < v->size && (c = v->arr[i]); i++)
+
+void freePlugins(struct PluginVector** plugins);
 
 struct IntSet {
   int* set;
