@@ -58,6 +58,7 @@ void handleKeyEvent(struct keyState* ks, int evCode, int evVal);
 void setActivationCombo(struct keyState* ks, ...);
 bool resetActivationCombo(struct keyState* ks);
 bool activated(struct keyState* ks);
+int parseConf(struct confVars* conf, char* line);
 
 void reapChild(struct hakaContext* haka);
 

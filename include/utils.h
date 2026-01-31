@@ -7,17 +7,14 @@
 
 #include <libevdev/libevdev.h>
 
-typedef struct PluginVector {
+struct DbVoidPtrVector {
   int size;
   int capacity;
   void** arr;
-} PluginVector;
+};
 
-typedef struct CharVector {
-  int size;
-  int capacity;
-  void** arr;
-} CharVector;
+typedef struct DbVoidPtrVector PluginVector;
+typedef struct DbVoidPtrVector CharVector;
 
 #define MakeVector(vType, v)       \
   do {                             \
@@ -73,8 +70,6 @@ typedef struct CharVector {
 #define VectorCopy(vDest, vSrc) memcpy(vDest, vSrc, sizeof(*vSrc));
 
 #define ForEach(v, c) for (int i = 0; i < v->size && (c = v->arr[i]); i++)
-
-void freePlugins(struct PluginVector** plugins);
 
 struct IntSet {
   int* set;

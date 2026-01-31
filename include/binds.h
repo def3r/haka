@@ -38,8 +38,8 @@ void loadBindings(struct hakaContext* haka,
                   struct keyBindings** kbinds,
                   struct keyState* ks,
                   struct coreApi* api,
-                  struct PluginVector** plugins);
+                  PluginVector** plugins);
 
-#define Bind(func, ...) addKeyBind(kbinds, func, __VA_ARGS__, 0)
+void freePlugins(PluginVector** plugins);
 
 #endif

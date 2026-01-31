@@ -255,13 +255,6 @@ char *trim(char *s) {
   return rtrim(s);
 }
 
-void freePlugins(struct PluginVector **plugins) {
-  for (int i = 0; i < (*plugins)->size; i++) {
-    dlclose((*plugins)->arr[i]);
-  }
-  FreeVector((*plugins));
-}
-
 char *expandValidDir(char *val) {
   if (val[strlen(val) - 1] == '\\' || val[strlen(val) - 1] == '/') {
     val[strlen(val) - 1] = '\0';
