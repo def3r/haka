@@ -1,3 +1,4 @@
+#include <dlfcn.h>
 #include <errno.h>
 #include <linux/input-event-codes.h>
 #include <signal.h>
@@ -10,10 +11,33 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include "base.h"
+#include "binds.h"
+#include "core.h"
 #include "haka.h"
-#include "hakaBase.h"
-#include "hakaEventHandler.h"
-#include "hakaUtils.h"
+#include "plug.h"
+#include "utils.h"
+
+static struct coreApi hakaCoreAPI = {
+    .ver = HAKA_ABI_VERSION,
+
+    .addKeyBind = addKeyBind,
+
+    .spawnChild = spawnChild,
+    .getNotesFile = getNotesFile,
+    .switchFile = switchFile,
+    .getPrimarySelection = getPrimarySelection,
+    .openNotesFile = openNotesFile,
+    .writeFP2FD = writeFP2FD,
+    .closeNotesFile = closeNotesFile,
+    .writeTextToFile = writeTextToFile,
+    .writeSelectionToFile = writeSelectionToFile,
+
+    .openFile = openFile,
+
+    .sendTextToFile = sendTextToFile,
+    .triggerTofi = triggerTofi,
+};
 
 int main() {
   // Need to disable full buffering and switch to
@@ -37,8 +61,12 @@ int main() {
   struct keyBindings *kbinds = initKeyBindings(2);
   // clang-format on
 
+  struct coreApi* api = &hakaCoreAPI;
+  PluginVector *plugins;
+  MakeVector(PluginVector, plugins);
+
   // Load Key Binds (./bindings.c)
-  loadBindings(kbinds, ks);
+  loadBindings(haka, &kbinds, ks, api, &plugins);
 
   gid_t curGrp;
   switchGrp(&curGrp, "input");
@@ -85,7 +113,9 @@ int main() {
         handleKeyEvent(ks, ev.code, ev.value);
 
         if (activated(ks)) {
-          executeKeyBind(kbinds, ks, haka);
+          if (executeKeyBind(kbinds, ks, haka) == RELOAD) {
+            loadBindings(haka, &kbinds, ks, api, &plugins);
+          }
         }
 
         if (haka->childCount > 0) {
@@ -95,12 +125,14 @@ int main() {
     }
   }
 
-  Println("Clean up initiated");
+  DLOG("Clean up initiated");
   for (int i = 0; i < set->size; i++) {
     libevdev_free(devs[i]);
     close(fds[i]);
   }
-  free(set);
+  freeIntSet(&set);
+  DeepFreeVector(haka->config->editor);
+  DeepFreeVector(haka->config->terminal);
   free(haka->config);
   free(haka);
 
@@ -108,10 +140,9 @@ int main() {
   free(ks->activationCombo);
   free(ks);
 
-  free(kbinds->kbind->keys);
-  free(kbinds->kbind);
-  free(kbinds);
-  Println("Clean up complete");
+  freeKeyBindings(&kbinds);
+  freePlugins(&plugins);
+  DLOG("Clean up complete");
 
   return 0;
 }
@@ -192,94 +223,34 @@ bool activated(struct keyState *ks) {
   return true;
 }
 
-int parseConf(struct confVars *conf, char *line) {
-  if (line == NULL || conf == NULL) {
-    return -1;
-  }
-
-  line = trim(line);
-  if (line[0] == '#')
-    return 0;
-
-  char *c = line;
-  for (; *c != '\0' && *c != '='; c++)
-    ;
-  if (*c != '=') {
-    return 1;
-  }
-
-  *c = '\0';
-  char *var = line;
-  char *val = ++c;
-  var = trim(var);
-  val = trim(val);
-
-  if (strlen(val) >= 3 && val[0] == '$' && val[1] == '(' &&
-      val[strlen(val) - 1] == ')') {
-    val = val + 2;
-    val[strlen(val) - 1] = '\0';
-    FILE *sh = popen(val, "r");
-    if (sh == NULL) {
-      perror("Unable to popen: ");
-      exit(1);
-    }
-
-    strcpy(val, "");
-    char res[BUFSIZE];
-    while (fgets(res, BUFSIZE, sh)) {
-      res[strcspn(res, "\n")] = '\0';
-      strcat(val, res);
-    }
-
-    fclose(sh);
-  }
-
-  if (strcmp(var, "editor") == 0) {
-    strcpy(conf->editor, val);
-  } else if (strcmp(var, "notes-dir") == 0) {
-    if (val[strlen(val) - 1] == '\\' || val[strlen(val) - 1] == '/') {
-      val[strlen(val) - 1] = '\0';
-    }
-    if (val[0] == '~' && (val[1] == '/' || val[1] == '\\')) {
-      char *home = getEnvVar("$HOME");
-      var = var + 1;
-      strcat(home, val);
-      val = home;
-    }
-    strcpy(conf->notesDir, val);
-  } else if (strcmp(var, "tofi-cfg") == 0) {
-    strcpy(conf->tofiCfg, val);
-  } else if (strcmp(var, "terminal") == 0) {
-    strcpy(conf->terminal, val);
-  }
-
-  return 0;
-}
-
 struct confVars *initConf(struct hakaContext *haka) {
   haka->config = (struct confVars *)malloc(sizeof(struct confVars));
   struct confVars *conf = haka->config;
 
-  strcpy(conf->editor, "/usr/bin/nvim");
+  MakeVector(CharVector, conf->editor);
+  MakeVector(CharVector, conf->terminal);
+
+  VectorPush(conf->editor, "/usr/bin/nvim");
   strCpyCat(conf->notesDir, haka->execDir, "/notes");
   strCpyCat(conf->tofiCfg, haka->execDir, "/tofi.cfg");
+  strCpyCat(conf->pluginsDir, haka->execDir, "/plugins");
 
   char *term = getEnvVar("$TERM");
   if (term == NULL) {
-    fprintf(stderr, "Cannot get var $TERM, recieved NULL\n");
+    Fprintln(stderr, "Cannot get var $TERM, recieved NULL");
   }
   if (strcmp(term, "") == 0) {
-    fprintf(stderr, "Cannot get var $TERM, recieved '%s'\n", term);
-    strcpy(conf->terminal, "alacritty");
+    Fprintln(stderr, "Cannot get var $TERM, recieved '%s'", term);
+    VectorPush(conf->terminal, "alacritty");
   } else {
-    strcpy(conf->terminal, term);
+    VectorPush(conf->terminal, term);
   }
 
   char configFile[BUFSIZE];
   strCpyCat(configFile, haka->execDir, "/haka.cfg");
   FILE *file = fopen(configFile, "r");
   if (file == NULL) {
-    printf("No config file haka.cfg found in execDir: %s\n", haka->execDir);
+    ILOG("No config file haka.cfg found in execDir: %s", haka->execDir);
     return conf;
   }
 
@@ -315,7 +286,7 @@ struct hakaContext *initHaka() {
   haka->fp = NULL;
   haka->childCount = 0;
 
-  printf("Notes File: %ld %s\n", strlen(haka->notesFile), haka->notesFile);
+  DLOG("Notes File: %ld %s", strlen(haka->notesFile), haka->notesFile);
 
   // forceSudo();
   //
@@ -350,7 +321,7 @@ void getExeDir(struct hakaContext *haka) {
     exit(1);
   }
   haka->execDir[nbytes] = '\0';
-  printf("Readlink: %s\n", haka->execDir);
+  DLOG("Readlink: %s", haka->execDir);
 
   // Strip off the file name
   char *p = &haka->execDir[nbytes];
@@ -360,12 +331,12 @@ void getExeDir(struct hakaContext *haka) {
 
   size_t len = p - &haka->execDir[0];
   if (len <= 0) {
-    printf("Invalid path to binary %s", haka->execDir);
+    Fprintln(stderr, "Invalid path to binary %s", haka->execDir);
     exit(1);
   }
   haka->execDir[len] = '\0';
 
-  printf("Dir Path: %s\n", haka->execDir);
+  DLOG("Dir Path: %s", haka->execDir);
 }
 
 void getPrevFile(struct hakaContext *haka) {
@@ -390,7 +361,7 @@ void getPrevFile(struct hakaContext *haka) {
 void reapChild(struct hakaContext *haka) {
   pid_t pid;
   while ((pid = waitpid(-1, NULL, WNOHANG)) > 0) {
-    printf("Reaped child proc %d\n", pid);
+    ILOG("Reaped child proc %d", pid);
     haka->childCount--;
   }
 }

@@ -1,4 +1,5 @@
 #include <dirent.h>
+#include <dlfcn.h>
 #include <fcntl.h>
 #include <grp.h>
 #include <stdio.h>
@@ -8,8 +9,8 @@
 
 #include <libevdev/libevdev.h>
 
-#include "hakaBase.h"
-#include "hakaUtils.h"
+#include "base.h"
+#include "utils.h"
 
 struct IntSet *initIntSet(int capacity) {
   struct IntSet *set = (struct IntSet *)malloc(sizeof(struct IntSet));
@@ -23,6 +24,16 @@ struct IntSet *initIntSet(int capacity) {
   set->set = (int *)malloc(sizeof(int) * capacity);
 
   return set;
+}
+
+void freeIntSet(struct IntSet **set) {
+  if (set == NULL || *set == NULL) {
+    return;
+  }
+
+  free((*set)->set);
+  free(*set);
+  *set = NULL;
 }
 
 int pushIntSet(struct IntSet *set, int val) {
@@ -87,13 +98,13 @@ int checkPackage(const char *pkgName) {
 
   int retVal = system(cmd);
   if (retVal == -1) {
-    printf("system() failed to execute.");
+    Println("system() failed to execute.");
     perror("system err: ");
     exit(1);
   }
   if (WEXITSTATUS(retVal) != 0) {
-    printf("Cannot find %s in PATH\n", pkgName);
-    printf("which %s returned %d\n", pkgName, WEXITSTATUS(retVal));
+    Println("Cannot find %s in PATH", pkgName);
+    Println("which %s returned %d", pkgName, WEXITSTATUS(retVal));
     return 1;
   }
   return 0;
@@ -128,7 +139,7 @@ int getKbdEvents(struct IntSet *set) {
     perror("Failed to open directory");
     exit(1);
   }
-  printf("ref for /dev/input/by-path/ created @ %p\n", dir);
+  ILOG("ref for /dev/input/by-path/ created @ %p", dir);
 
   if (set == NULL) {
     set = initIntSet(2);
@@ -145,8 +156,8 @@ int getKbdEvents(struct IntSet *set) {
       continue;
     }
 
-    char compVal[9];
-    strncpy(compVal, entry->d_name + dNameLen - 9, 9);
+    char compVal[10] = {};
+    strncpy(compVal, entry->d_name + dNameLen - 9, 10); // do copy the \0
     if (strcmp("event-kbd", compVal) != 0) {
       continue;
     }
@@ -159,19 +170,22 @@ int getKbdEvents(struct IntSet *set) {
     }
     symlinkTo[len] = '\0';
 
-    printf("Entry: /dev/input/by-path/%s\t\tis a symlink to -> %s\n",
-           entry->d_name, symlinkTo);
+    ILOG("Entry: /dev/input/by-path/%s\t\tis a symlink to -> %s", entry->d_name,
+         symlinkTo);
     pushIntSet(set, atoi((symlinkTo + 8)));
   }
 
   closedir(dir);
 
   int size = set->size;
-  printf("eventX is a keyboard Event | X =  ");
+  char setStr[BUFSIZE] = {};
   while (size-- > 0) {
-    printf("%d, ", set->set[size]);
+    size_t slen = strlen(setStr);
+    if (slen < BUFSIZE) {
+      snprintf(setStr + slen, BUFSIZE - slen, "%d, ", set->set[size]);
+    }
   }
-  printf("\b\b;\n");
+  ILOG("eventX is a keyboard Event | X = %s\b\b;", setStr);
 
   return 0;
 }
@@ -181,10 +195,10 @@ int openKbdDevices(struct IntSet *set, int *fds, struct libevdev **devs) {
   char kbd[BUFSIZE];
   struct libevdev *dev = NULL;
 
-  Fprintln(stdout, "------");
+  ILOG("------");
   for (int i = 0; i < set->size; i++) {
     snprintf(kbd, BUFSIZE, "/dev/input/event%d", set->set[i]);
-    Fprintln(stdout, "Opening: %s", kbd);
+    ILOG("Opening: %s", kbd);
 
     fd = open(kbd, O_RDONLY | O_NONBLOCK);
     if (fd < 0) {
@@ -193,8 +207,8 @@ int openKbdDevices(struct IntSet *set, int *fds, struct libevdev **devs) {
     }
 
     libevdev_new_from_fd(fd, &dev);
-    Fprintln(stdout, "Device: %s\nfd: %d", libevdev_get_name(dev), fd);
-    Fprintln(stdout, "Listening for key events...\n------");
+    ILOG("Device: %s\nfd: %d", libevdev_get_name(dev), fd);
+    ILOG("Listening for key events...\n------");
     fds[i] = fd;
     devs[i] = dev;
   }
@@ -207,7 +221,7 @@ char *getEnvVar(const char *var) {
 
   FILE *fp = popen(cmd, "r");
   if (fp == NULL) {
-    fprintf(stderr, "Unable to get Env Var %s\n", var);
+    Fprintln(stderr, "Unable to get Env Var %s", var);
     return NULL;
   }
 
@@ -239,4 +253,18 @@ char *rtrim(char *s) {
 char *trim(char *s) {
   s = ltrim(s);
   return rtrim(s);
+}
+
+char *expandValidDir(char *val) {
+  if (val[strlen(val) - 1] == '\\' || val[strlen(val) - 1] == '/') {
+    val[strlen(val) - 1] = '\0';
+  }
+  if (val[0] == '~' && (val[1] == '/' || val[1] == '\\')) {
+    char *home = getEnvVar("$HOME");
+    val = val + 1;
+    strcat(home, val);
+    val = home;
+  }
+
+  return val;
 }

@@ -3,47 +3,23 @@
 
 #include <stdio.h>
 
+#include "base.h"
 #include "haka.h"
-#include "hakaBase.h"
-#include "hakaUtils.h"
+#include "utils.h"
 
-struct keyBinding {
-  struct IntSet* keys;
-  void (*func)(struct hakaContext*);
-};
-
-struct keyBindings {
-  int size;
-  int capacity;
-  struct keyBinding* kbind;
-};
-
-struct keyBindings* initKeyBindings(int size);
-void addKeyBind(struct keyBindings* kbinds,
-                void (*func)(struct hakaContext*),
-                int keyToBind,
-                ...);
-void pushKeyBind(struct keyBindings* kbinds, struct keyBinding* kbind);
-void executeKeyBind(struct keyBindings* kbinds,
-                    struct keyState* ks,
-                    struct hakaContext* haka);
-void loadBindings(struct keyBindings* kbinds, struct keyState* ks);
-
-// Event Handler Declarations
 void switchFile(struct hakaContext* haka);
-void writeToFile(struct hakaContext* haka);
-void writePointToFile(struct hakaContext* haka);
+void writeSelectionToFile(struct hakaContext* haka);
 void openFile(struct hakaContext* haka);
-void sendNewlineToFile(struct hakaContext* haka);
+void sendTextToFile(struct hakaContext* haka, char* text);
+void writeTextToFile(struct hakaContext* haka, char* prefix, char* suffix);
 
-// Event Handler Helper Functions
-FILE* getPrimarySelection(struct hakaContext* haka);
+void getPrimarySelection(struct hakaContext* haka, FILE** fp);
+void getNotesFile(struct hakaContext* haka, char fileName[BUFSIZE * 2]);
 int openNotesFile(struct hakaContext* haka);
+void spawnChild(struct hakaContext*, char* argv[]);
 int closeNotesFile(struct hakaContext* haka);
 size_t writeFP2FD(struct hakaContext* haka);
-FILE* triggerTofi(struct hakaContext* haka);
-
-#define Bind(func, ...) addKeyBind(kbinds, func, __VA_ARGS__, 0)
+void triggerTofi(struct hakaContext* haka, FILE** fp);
 
 #define updatePrevFile(haka)                                                   \
   haka->fdPrevFile = open(haka->prevFile, O_TRUNC | O_CREAT | O_WRONLY, 0666); \
