@@ -78,4 +78,30 @@ int hakaPluginInit(struct coreApi* capi, struct keyBindings* kbinds);
   return 0;      \
   }
 
+#define Fprintln(buf, ...)   \
+  fprintf(buf, __VA_ARGS__); \
+  fprintf(buf, "\n")
+
+#define Println(...)   \
+  printf(__VA_ARGS__); \
+  printf("\n")
+
+// clang-format off
+#if defined(LOG) && LOG == 2
+#  define DLOG(...)       \
+     printf(__VA_ARGS__); \
+     printf("\n")
+#else
+#  define DLOG(...)
+#endif
+
+#if defined(LOG) && LOG >= 1
+#  define ILOG(...)       \
+     printf(__VA_ARGS__); \
+     printf("\n")
+#else
+#  define ILOG(...)
+#endif
+// clang-format on
+
 #endif  // !HAKA_PLUG_H_

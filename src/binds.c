@@ -35,7 +35,7 @@ static void loadPlugins(char *path, struct keyBindings *kbinds,
       h = dlopen(fullPath, RTLD_NOW | RTLD_LOCAL);
     binding:
       if (h == NULL) {
-        Fprintln(stderr, "Error loading plugin %s: %s", fullPath, dlerror());
+        DLOG("Error loading plugin %s: %s", fullPath, dlerror());
         break;
       }
 
@@ -44,7 +44,7 @@ static void loadPlugins(char *path, struct keyBindings *kbinds,
         Fprintln(stderr, "Cannot find hakaPluginInit for %s", fullPath);
         dlclose(h);
       } else {
-        Println("Plugin Loaded: %s", fullPath);
+        ILOG("Plugin Loaded: %s", fullPath);
         if (!init(api, kbinds)) {
           VectorPush(plugins, h);
         }
@@ -82,13 +82,13 @@ void loadBindings(struct hakaContext *haka, struct keyBindings **kbinds,
   }
 
   if ((*plugins)->size != 0) {
-    Println("Reloading Plugins");
+    DLOG("Reloading Plugins");
     freeKeyBindings(kbinds);
     *kbinds = initKeyBindings(2);
 
     freePlugins(plugins);
     MakeVector(PluginVector, *plugins);
-    Println("Done FREEing Keybinds");
+    DLOG("Done FREEing Keybinds");
   } else {
     // Activation Combo
     ActivationCombo(KEY_LEFTCTRL, KEY_LEFTALT);

@@ -148,6 +148,7 @@ Now bind your action to a key in *`src/bindings.c`* using the `Bind(function, KE
   To kill all procs with keyd: `killall -s 0 keyd`
 
 ## TODO
+- [x] Log levels
 - [ ] Switch to gtk(?): to reduce dependencies.
 - [x] Add a config file option for vars.
 - [x] Ignore newlines in selection(?)

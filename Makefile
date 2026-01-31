@@ -12,6 +12,8 @@ CFLAGS := -I$(INCDIR) -I./libevdev-$(LIBEVDEV_VERSION)
 CFLAGS_SO := -fPIC -Wall -Wextra -Wpedantic -shared -I$(INCDIR)
 SRC := $(wildcard src/*.c)
 OUT := haka.out
+# 1 for Info logs, 2 for Debug logs
+LOG_LEVEL := -DLOG=2
 
 .PHONY: all clean plugins
 
@@ -22,7 +24,7 @@ plugins:
 	$(MAKE) -C plugins CFLAGS_SO="$(CFLAGS_SO)"
 
 $(OUT): $(SRC) $(LDLIBS)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
+	$(CC) $(LOG_LEVEL) $(CFLAGS) -o $@ $^ $(LDLIBS)
 
 $(LDLIBS): $(LIBEVDEV_TAR)
 	tar -xf $(LIBEVDEV_TAR)
@@ -36,4 +38,3 @@ clean:
 	rm -f $(OUT)
 	rm -rf prevFile.txt
 	rm -rf $(LIBEVDEV_DIR)
-

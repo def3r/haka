@@ -124,7 +124,7 @@ int main() {
     }
   }
 
-  Println("Clean up initiated");
+  DLOG("Clean up initiated");
   for (int i = 0; i < set->size; i++) {
     libevdev_free(devs[i]);
     close(fds[i]);
@@ -141,7 +141,7 @@ int main() {
 
   freeKeyBindings(&kbinds);
   freePlugins(&plugins);
-  Println("Clean up complete");
+  DLOG("Clean up complete");
 
   return 0;
 }
@@ -377,8 +377,8 @@ int parseConf(struct confVars *conf, char *line) {
     strcpy(conf->pluginsDir, expandValidDir(val));
   }
 
-  Println("%s [%d]:", var, argv->size);
-  ForEach(argv, arg) { Println("Arg: %s", arg); }
+  DLOG("%s [%d]:", var, argv->size);
+  ForEach(argv, arg) { DLOG("Arg: %s", arg); }
 
   return 0;
 }
@@ -410,7 +410,7 @@ struct confVars *initConf(struct hakaContext *haka) {
   strCpyCat(configFile, haka->execDir, "/haka.cfg");
   FILE *file = fopen(configFile, "r");
   if (file == NULL) {
-    Println("No config file haka.cfg found in execDir: %s", haka->execDir);
+    ILOG("No config file haka.cfg found in execDir: %s", haka->execDir);
     return conf;
   }
 
@@ -446,7 +446,7 @@ struct hakaContext *initHaka() {
   haka->fp = NULL;
   haka->childCount = 0;
 
-  Println("Notes File: %ld %s", strlen(haka->notesFile), haka->notesFile);
+  DLOG("Notes File: %ld %s", strlen(haka->notesFile), haka->notesFile);
 
   // forceSudo();
   //
@@ -481,7 +481,7 @@ void getExeDir(struct hakaContext *haka) {
     exit(1);
   }
   haka->execDir[nbytes] = '\0';
-  Println("Readlink: %s", haka->execDir);
+  DLOG("Readlink: %s", haka->execDir);
 
   // Strip off the file name
   char *p = &haka->execDir[nbytes];
@@ -496,7 +496,7 @@ void getExeDir(struct hakaContext *haka) {
   }
   haka->execDir[len] = '\0';
 
-  Println("Dir Path: %s", haka->execDir);
+  DLOG("Dir Path: %s", haka->execDir);
 }
 
 void getPrevFile(struct hakaContext *haka) {
@@ -521,7 +521,7 @@ void getPrevFile(struct hakaContext *haka) {
 void reapChild(struct hakaContext *haka) {
   pid_t pid;
   while ((pid = waitpid(-1, NULL, WNOHANG)) > 0) {
-    Println("Reaped child proc %d", pid);
+    ILOG("Reaped child proc %d", pid);
     haka->childCount--;
   }
 }
