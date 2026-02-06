@@ -15,9 +15,8 @@
 void switchFile(struct hakaContext *haka) {
   contextCheck(haka);
 
-  printf("CTRL + ALT + M detected!\n");
-  printf("Launching tofi\n");
-  printf("tofi.cfg path: %s\n", haka->config->tofiCfg);
+  ILOG("Launching tofi\n");
+  DLOG("tofi.cfg path: %s\n", haka->config->tofiCfg);
 
   triggerTofi(haka, &haka->fp);
 
@@ -26,7 +25,7 @@ void switchFile(struct hakaContext *haka) {
   while (fgets(buf, BUFSIZE, haka->fp)) {
     selection = true;
     buf[strcspn(buf, "\n")] = 0;
-    printf("Selected: %ld %s\n", strlen(buf), buf);
+    ILOG("Selected: %ld %s\n", strlen(buf), buf);
     fflush(stdout);
   }
 
@@ -66,7 +65,7 @@ void writeTextToFile(struct hakaContext *haka, char *prefix, char *suffix) {
 void writeSelectionToFile(struct hakaContext *haka) {
   contextCheck(haka);
 
-  Println("Dispatching request to get primary selection");
+  ILOG("Dispatching request to get primary selection");
   getPrimarySelection(haka, &haka->fp);
   openNotesFile(haka);
 
@@ -90,7 +89,7 @@ void spawnChild(struct hakaContext *haka, char *argv[]) {
     return;
   }
   if (pid == 0) {
-    Println("Executing %s", *argv);
+    ILOG("Executing %s", *argv);
     execv(argv[0], argv);
     perror("execv failed to child");
     exit(1);
@@ -103,7 +102,7 @@ void spawnChild(struct hakaContext *haka, char *argv[]) {
 void openFile(struct hakaContext *haka) {
   contextCheck(haka);
 
-  printf("Opening current note in editor\n");
+  ILOG("Opening current note in editor\n");
 
   CharVector argv = {.size = 0, .capacity = 0, .arr = NULL};
   CharVector *argvPtr = &argv;
@@ -113,9 +112,8 @@ void openFile(struct hakaContext *haka) {
   VectorPush(argvPtr, haka->notesFile);
   VectorPush(argvPtr, NULL);
 
-  printf("Executing: ");
-  ForEach(argvPtr, arg) { printf("%s ", arg); }
-  printf("\n");
+  DLOG("Executing: ");
+  ForEach(argvPtr, arg) { DLOG("%s ", arg); }
   spawnChild(haka, (char **)argv.arr);
 
   free(argv.arr); // Better be on stack
@@ -166,7 +164,7 @@ size_t writeFP2FD(struct hakaContext *haka) {
   while (fgets(buf, BUFSIZE, haka->fp)) {
     buf[strcspn(buf, "\n")] = 0;
     bytes += strlen(buf);
-    printf("%ld %s", strlen(buf), buf);
+    DLOG("%ld %s", strlen(buf), buf);
     write(haka->fdNotesFile, buf, strlen(buf));
   }
   write(haka->fdNotesFile, "\n", 1);
@@ -186,7 +184,7 @@ void triggerTofi(struct hakaContext *haka, FILE **fp) {
            "%s  --prompt-text=\"  select:  \" "
            "--placeholder-text=\"%s\" --require-match=false",
            basecmd, haka->notesFileName);
-  printf("Executing: %s\n", cmd);
+  DLOG("Executing: %s\n", cmd);
 
   *fp = popen(cmd, "r");
   if (*fp == NULL) {

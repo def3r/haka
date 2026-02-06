@@ -61,7 +61,7 @@ int main() {
   struct keyBindings *kbinds = initKeyBindings(2);
   // clang-format on
 
-  struct coreApi* api = &hakaCoreAPI;
+  struct coreApi *api = &hakaCoreAPI;
   PluginVector *plugins;
   MakeVector(PluginVector, plugins);
 

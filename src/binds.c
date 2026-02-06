@@ -9,6 +9,10 @@
 #include "haka.h"
 #include "utils.h"
 
+static void setActivationCombo_(struct keyState *ks) {
+  ActivationCombo(KEY_LEFTCTRL, KEY_LEFTALT);
+}
+
 struct keyBindings *initKeyBindings(int size) {
   if (size < 0) {
     Fprintln(stderr, "keybinds size < 0?");
@@ -224,7 +228,7 @@ void loadBindings(struct hakaContext *haka, struct keyBindings **kbinds,
     DLOG("Done FREEing Keybinds");
   } else {
     // Activation Combo
-    ActivationCombo(KEY_LEFTCTRL, KEY_LEFTALT);
+    setActivationCombo_(ks);
   }
 
   loadPlugins(haka->config->pluginsDir, *kbinds, api, *plugins);

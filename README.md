@@ -13,7 +13,8 @@ Simply select text, press the key combination, and it's added to your file! With
 - [Configuration](https://github.com/def3r/haka?tab=readme-ov-file#config)
   - [Config Options](https://github.com/def3r/haka?tab=readme-ov-file#config-options)
 - [Guide](https://github.com/def3r/haka?tab=readme-ov-file#guide)
-  - [Keybinds](https://github.com/def3r/haka?tab=readme-ov-file#keybinds)
+- [Plugins](https://github.com/def3r/haka?tab=readme-ov-file#keybinds)
+    - [Writing your own Plugin]()
 - [Troubleshoot](https://github.com/def3r/haka?tab=readme-ov-file#troubleshoot)
 
 ---
@@ -109,41 +110,81 @@ editor=$(which emacs)
 ### Config Options
 | Option | Value | Description |
 |--------|-------|-------------|
-| editor | /path/to/editor/bin | Specify the editor to open files in | 
-| terminal | /path/to/terminal/bin | Specify the terminal to open editor in | 
-| notes-dir | /path/to/notes/dir | Custom path to notes dir | 
-| tofi-cfg | /path/to/tofi/cfg | Custom path for tofi.cfg file | 
+| editor | /path/to/editor/bin | Specify the editor to open files in |
+| terminal | /path/to/terminal/bin | Specify the terminal to open editor in |
+| notes-dir | /path/to/notes/dir | Custom path to notes dir |
+| tofi-cfg | /path/to/tofi/cfg | Custom path for tofi.cfg file |
+| plugins | /path/to/plugins/dir/ | Custom path for plugins dir |
 
 ## Guide
 - The files displayed in the selection menu is the `notes/` directory and can be found in the directory containing *haka* executable
 - The file is opened by default in *[`neovim`](https://github.com/neovim/neovim)*
 - *`haka`* currently supports the first 249 `KEY_NAME` defined in *[`linux/input-event-codes.h`](https://raw.githubusercontent.com/whot/libevdev/refs/heads/master/include/linux/input-event-codes.h)*
-
-### KeyBinds
 - The defualt *`ActivationCombo`* is *`Ctr+Alt`*
-- The default keybinds and activation combo are set in the *[`src/bindings.c`](https://github.com/horrifyingHorse/haka/blob/main/src/bindings.c)*.
-- To make custom keybinds, create a function with this prototype: `void func(struct hakaStatus *haka)`. Add its declaration in *`include/hakaEventHandler.h`* and implement it in *`src/hakaEventHandler.c`*.
-Now bind your action to a key in *`src/bindings.c`* using the `Bind(function, KEY_TOBIND...)` macro. Refer *[`linux/input-event-codes.h`](https://raw.githubusercontent.com/whot/libevdev/refs/heads/master/include/linux/input-event-codes.h)* for `KEY_NAME` macros.
+- The default activation combo is set in the *[`src/binds.c:setActivationCombo_`](https://github.com/def3r/haka/blob/main/src/binds.c)*.
 
-> [!IMPORTANT]
-> Do not use `open` or `close` on `haka->fdNotesFile`, since state is internally managed by [`eventHandlerEpilogue`](https://github.com/horrifyingHorse/haka/blob/620a1b572b9194239f026b97cd2ae47d12833bcf/include/hakaEventHandler.h#L55), use wrappers around it like [`openNotesFile`](https://github.com/horrifyingHorse/haka/blob/620a1b572b9194239f026b97cd2ae47d12833bcf/include/hakaEventHandler.h#L41) and [`closeNotesFile`](https://github.com/horrifyingHorse/haka/blob/620a1b572b9194239f026b97cd2ae47d12833bcf/include/hakaEventHandler.h#L42).
+## Plugins
+- The only way to add New custom keybinds is to make plugins. This might sound
+  tedious but is simple.
+- By default, haka comes with plugins. You can see them in *plugins/* directory.
 
+A very basic example to extend a plugin (Assuming *haka* is already running). In *`plugins/default.c`*, add this function:
+```c
+static void hello_world(struct hakaContext* ctx) {
+  printf("Hello World!\n");
+}
+```
 
-| Key Combination | Binded Task |
-|-----------------|-------------|
-| *`Ctrl+Alt + C`* | Paste the current selection to the current file |
-| *`Ctrl+Alt + .`* | Paste the current selection as an unordered list item to the current file |
-| *`Ctrl+Alt + N`* | Send a Blank Line to the current file |
-| *`Ctrl+Alt + M`* | Opens the file selection menu |
-| *`Ctrl+Alt + O`* | Opens the file in neovim |
+And under the `BEGIN_BIND ... END_BIND` section of the file, register your function by adding this
+line:
+```c
+  Bind(hello_world, KEY_H);
+```
 
+Thats it! We have made a new keybind! now, compile the file, in *plugins/* directory run:
+```sh 
+make
+```
+
+Now press your *ActivationCombo*(by deafault its `RIGHT_ALT + RIGHT_CTRL`) + R
+to reload the plugins and then press *ActivationCombo + H* and you can see
+"Hello World!" printed on the terminal!
+
+### Writing your own Plugin:
+- A plugin is just a shared object (`.so`) inside the *`plugins/`* directory or
+  the directory specified in the config file.
+- A function **must** be of the prototype: `void func(struct hakaContext *ctx)` to be `Bind`able. Refer *[`linux/input-event-codes.h`](https://raw.githubusercontent.com/whot/libevdev/refs/heads/master/include/linux/input-event-codes.h)* for `KEY_NAME` macros.
+
+**Boilerplate for plugin:**
+```c
+#include "plug.h" // Can be found in include/
+
+struct coreApi *api;
+
+/*
+  Your functions go here
+*/
+
+BEGIN_BIND
+  /*
+    Register your functions to keys here
+  */
+END_BIND
+```
+You can use the *api* ptr to call core feature functions and extract data from within the `ctx`.
+
+**Compiling the plugin**
+- Ensure that plugin is compiled using: `-fPIC -shared` flags
 
 ## Troubleshoot
-- If some processes do not work/launch, this is usually because at the time of booting, required env variables were not set. This is a known issue.
+- If some processes do not work/launch, this is usually because at the time of
+  booting, required env variables were not set. This is a known issue.
   `systemctl --user restart haka` should be done after booting.
 
-- If noo keybind is working, the issue is most probably with `keyd`. `keyd` and `haka` cannot run simultaneously. This is because `keyd` grabs
-  the input devies, thus leaving `haka` to poll the input devices indefinitely. `kill`ing the `keyd` process should resolve the issue.<br>
+- If noo keybind is working, the issue is most probably with `keyd`. `keyd` and
+  `haka` cannot run simultaneously. This is because `keyd` grabs the input
+  devies, thus leaving `haka` to poll the input devices indefinitely. `kill`ing
+  the `keyd` process should resolve the issue.<br>
   Confirm `keyd` is running: `pgrep keyd`.<br>
   To kill all procs with keyd: `killall -s 0 keyd`
 
