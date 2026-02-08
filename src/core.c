@@ -12,6 +12,8 @@
 #include "plug.h"
 #include "utils.h"
 
+// Declarations & Core Api Def {{{
+
 #define updatePrevFile(haka)                                                   \
   haka->fdPrevFile = open(haka->prevFile, O_TRUNC | O_CREAT | O_WRONLY, 0666); \
   if (haka->fdPrevFile > 0) {                                                  \
@@ -68,6 +70,8 @@ static struct coreApi hakaCoreAPI = {
     .sendTextToFile = sendTextToFile,
     .triggerTofi = triggerTofi,
 };
+
+// }}}
 
 struct coreApi* getCoreApi() {
   return &hakaCoreAPI;
@@ -254,3 +258,5 @@ static void triggerTofi(struct hakaContext *haka, FILE **fp) {
     exit(1);
   }
 }
+
+// vim: foldmethod=marker

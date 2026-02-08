@@ -4,6 +4,8 @@
 #include "haka.h"
 #include "utils.h"
 
+// Private {{{
+
 static int parseConfVal(char *var, char *val, char *arg,
                         CharVector *argv) {
   while (strlen(val)) {
@@ -110,6 +112,8 @@ static int parseConfVal(char *var, char *val, char *arg,
   return 0;
 }
 
+// }}}
+
 int parseConf(struct confVars *conf, char *line) {
   if (line == NULL || conf == NULL) {
     return -1;
@@ -165,3 +169,5 @@ int parseConf(struct confVars *conf, char *line) {
 
   return 0;
 }
+
+// vim: foldmethod=marker

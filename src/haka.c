@@ -14,7 +14,6 @@
 #include "base.h"
 #include "binds.h"
 #include "haka.h"
-#include "plug.h"
 #include "utils.h"
 
 int main() {
@@ -125,24 +124,6 @@ int main() {
   return 0;
 }
 
-struct keyState *initKeyState(int16_t size) {
-  struct keyState *ks = (struct keyState *)malloc(sizeof(struct keyState));
-  if (ks == 0) {
-    Fprintln(stderr, "malloc failed for keymap");
-    exit(EXIT_FAILURE);
-  }
-
-  ks->size = size;
-  ks->activationCombo = initIntSet(2);
-  ks->keyPress = (bool *)calloc(size, sizeof(bool));
-  if (ks->keyPress == 0) {
-    Fprintln(stderr, "calloc failed for keymap");
-    exit(EXIT_FAILURE);
-  }
-
-  return ks;
-}
-
 void handleKeyEvent(struct keyState *ks, int evCode, int evVal) {
   if (ks == 0) {
     Fprintln(stderr, "keyState pointer cannot be null to handle keys");
@@ -199,6 +180,26 @@ bool activated(struct keyState *ks) {
     }
   }
   return true;
+}
+
+// Initialization {{{
+
+struct keyState *initKeyState(int16_t size) {
+  struct keyState *ks = (struct keyState *)malloc(sizeof(struct keyState));
+  if (ks == 0) {
+    Fprintln(stderr, "malloc failed for keymap");
+    exit(EXIT_FAILURE);
+  }
+
+  ks->size = size;
+  ks->activationCombo = initIntSet(2);
+  ks->keyPress = (bool *)calloc(size, sizeof(bool));
+  if (ks->keyPress == 0) {
+    Fprintln(stderr, "calloc failed for keymap");
+    exit(EXIT_FAILURE);
+  }
+
+  return ks;
 }
 
 struct confVars *initConf(struct hakaContext *haka) {
@@ -290,6 +291,8 @@ struct hakaContext *initHaka() {
   return haka;
 }
 
+// }}}
+
 void getExeDir(struct hakaContext *haka) {
   contextCheck(haka);
 
@@ -343,3 +346,5 @@ void reapChild(struct hakaContext *haka) {
     haka->childCount--;
   }
 }
+
+// vim: foldmethod=marker

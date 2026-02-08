@@ -73,6 +73,8 @@ int dynamicInc(struct IntSet *set) {
   return 0;
 }
 
+// Essential {{{
+
 void forceSudo() {
   if (!getuid()) {
     return;
@@ -235,6 +237,8 @@ char *getEnvVar(const char *var) {
   return res;
 }
 
+// }}}
+
 char *ltrim(char *s) {
   for (; s != NULL && (*s == ' ' || *s == '\t'); s++)
     ;
@@ -268,3 +272,5 @@ char *expandValidDir(char *val) {
 
   return val;
 }
+
+// vim: foldmethod=marker
