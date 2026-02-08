@@ -7,12 +7,73 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "core.h"
+#include "binds.h"
 #include "haka.h"
 #include "plug.h"
 #include "utils.h"
 
-void switchFile(struct hakaContext *haka) {
+#define updatePrevFile(haka)                                                   \
+  haka->fdPrevFile = open(haka->prevFile, O_TRUNC | O_CREAT | O_WRONLY, 0666); \
+  if (haka->fdPrevFile > 0) {                                                  \
+    write(haka->fdPrevFile, haka->notesFileName, strlen(haka->notesFileName)); \
+  }                                                                            \
+  close(haka->fdPrevFile);
+
+#define eventHandlerEpilogue(haka)                                             \
+  if (haka != NULL) {                                                          \
+    if (haka->fp != NULL) {                                                    \
+      pclose(haka->fp);                                                        \
+      haka->fp = NULL;                                                         \
+    }                                                                          \
+    if (haka->fdNotesFile > 0)                                                 \
+      close(haka->fdNotesFile);                                                \
+    haka->fdNotesFile = -1;                                                    \
+    haka->served = true;                                                       \
+  }
+
+// clang-format off
+static void switchFile(struct hakaContext *haka);
+static void writeSelectionToFile(struct hakaContext *haka);
+static void openFile(struct hakaContext *haka);
+static void sendTextToFile(struct hakaContext *haka, char *text);
+static void writeTextToFile(struct hakaContext *haka, char *prefix,
+                            char *suffix);
+
+static void   getPrimarySelection(struct hakaContext *haka, FILE **fp);
+static void   getNotesFile(struct hakaContext *haka, char fileName[BUFSIZE * 2]);
+static int    openNotesFile(struct hakaContext *haka);
+static void   spawnChild(struct hakaContext *, char *argv[]);
+static int    closeNotesFile(struct hakaContext *haka);
+static size_t writeFP2FD(struct hakaContext *haka);
+static void   triggerTofi(struct hakaContext *haka, FILE **fp);
+// clang-format off
+
+static struct coreApi hakaCoreAPI = {
+    .ver = HAKA_ABI_VERSION,
+
+    .addKeyBind = addKeyBind,
+
+    .spawnChild = spawnChild,
+    .getNotesFile = getNotesFile,
+    .switchFile = switchFile,
+    .getPrimarySelection = getPrimarySelection,
+    .openNotesFile = openNotesFile,
+    .writeFP2FD = writeFP2FD,
+    .closeNotesFile = closeNotesFile,
+    .writeTextToFile = writeTextToFile,
+    .writeSelectionToFile = writeSelectionToFile,
+
+    .openFile = openFile,
+
+    .sendTextToFile = sendTextToFile,
+    .triggerTofi = triggerTofi,
+};
+
+struct coreApi* getCoreApi() {
+  return &hakaCoreAPI;
+}
+
+static void switchFile(struct hakaContext *haka) {
   contextCheck(haka);
 
   ILOG("Launching tofi\n");
@@ -38,7 +99,7 @@ void switchFile(struct hakaContext *haka) {
   eventHandlerEpilogue(haka);
 }
 
-void sendTextToFile(struct hakaContext *haka, char *text) {
+static void sendTextToFile(struct hakaContext *haka, char *text) {
   openNotesFile(haka);
   if (text != NULL) {
     write(haka->fdNotesFile, text, strlen(text));
@@ -46,7 +107,8 @@ void sendTextToFile(struct hakaContext *haka, char *text) {
   closeNotesFile(haka);
 }
 
-void writeTextToFile(struct hakaContext *haka, char *prefix, char *suffix) {
+static void writeTextToFile(struct hakaContext *haka, char *prefix,
+                            char *suffix) {
   contextCheck(haka);
 
   openNotesFile(haka);
@@ -62,7 +124,7 @@ void writeTextToFile(struct hakaContext *haka, char *prefix, char *suffix) {
   eventHandlerEpilogue(haka);
 }
 
-void writeSelectionToFile(struct hakaContext *haka) {
+static void writeSelectionToFile(struct hakaContext *haka) {
   contextCheck(haka);
 
   ILOG("Dispatching request to get primary selection");
@@ -74,7 +136,7 @@ void writeSelectionToFile(struct hakaContext *haka) {
   eventHandlerEpilogue(haka);
 }
 
-void spawnChild(struct hakaContext *haka, char *argv[]) {
+static void spawnChild(struct hakaContext *haka, char *argv[]) {
   contextCheck(haka);
   if (argv == NULL || *argv == NULL) {
     Fprintln(stderr, "no args provided to spawn a child");
@@ -99,7 +161,7 @@ void spawnChild(struct hakaContext *haka, char *argv[]) {
   eventHandlerEpilogue(haka);
 }
 
-void openFile(struct hakaContext *haka) {
+static void openFile(struct hakaContext *haka) {
   contextCheck(haka);
 
   ILOG("Opening current note in editor\n");
@@ -120,7 +182,7 @@ void openFile(struct hakaContext *haka) {
   eventHandlerEpilogue(haka);
 }
 
-void getPrimarySelection(struct hakaContext *haka, FILE **fp) {
+static void getPrimarySelection(struct hakaContext *haka, FILE **fp) {
   contextCheck(haka);
   if (fp == NULL)
     return;
@@ -132,11 +194,11 @@ void getPrimarySelection(struct hakaContext *haka, FILE **fp) {
   }
 }
 
-void getNotesFile(struct hakaContext *haka, char fileName[BUFSIZE * 2]) {
+static void getNotesFile(struct hakaContext *haka, char fileName[BUFSIZE * 2]) {
   strcpy(fileName, haka->notesFile);
 }
 
-int openNotesFile(struct hakaContext *haka) {
+static int openNotesFile(struct hakaContext *haka) {
   contextCheck(haka);
 
   haka->fdNotesFile = open(haka->notesFile, O_RDWR | O_CREAT | O_APPEND, 0666);
@@ -149,14 +211,14 @@ int openNotesFile(struct hakaContext *haka) {
   return haka->fdNotesFile;
 }
 
-int closeNotesFile(struct hakaContext *haka) {
+static int closeNotesFile(struct hakaContext *haka) {
   contextCheck(haka);
   int res = close(haka->fdNotesFile);
   haka->fdNotesFile = (res == 0) ? -1 : haka->fdNotesFile;
   return res;
 }
 
-size_t writeFP2FD(struct hakaContext *haka) {
+static size_t writeFP2FD(struct hakaContext *haka) {
   contextCheck(haka);
 
   size_t bytes = 0;
@@ -171,7 +233,7 @@ size_t writeFP2FD(struct hakaContext *haka) {
   return bytes;
 }
 
-void triggerTofi(struct hakaContext *haka, FILE **fp) {
+static void triggerTofi(struct hakaContext *haka, FILE **fp) {
   contextCheck(haka);
   if (fp == NULL) {
     return;

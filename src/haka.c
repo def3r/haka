@@ -13,31 +13,9 @@
 
 #include "base.h"
 #include "binds.h"
-#include "core.h"
 #include "haka.h"
 #include "plug.h"
 #include "utils.h"
-
-static struct coreApi hakaCoreAPI = {
-    .ver = HAKA_ABI_VERSION,
-
-    .addKeyBind = addKeyBind,
-
-    .spawnChild = spawnChild,
-    .getNotesFile = getNotesFile,
-    .switchFile = switchFile,
-    .getPrimarySelection = getPrimarySelection,
-    .openNotesFile = openNotesFile,
-    .writeFP2FD = writeFP2FD,
-    .closeNotesFile = closeNotesFile,
-    .writeTextToFile = writeTextToFile,
-    .writeSelectionToFile = writeSelectionToFile,
-
-    .openFile = openFile,
-
-    .sendTextToFile = sendTextToFile,
-    .triggerTofi = triggerTofi,
-};
 
 int main() {
   // Need to disable full buffering and switch to
@@ -61,7 +39,7 @@ int main() {
   struct keyBindings *kbinds = initKeyBindings(2);
   // clang-format on
 
-  struct coreApi *api = &hakaCoreAPI;
+  struct coreApi *api = getCoreApi();
   PluginVector *plugins;
   MakeVector(PluginVector, plugins);
 

@@ -48,6 +48,8 @@ struct keyState {
   bool* keyPress;
 };
 
+struct coreApi* getCoreApi();
+
 struct hakaContext* initHaka();
 struct confVars* initConf(struct hakaContext* haka);
 void getExeDir(struct hakaContext* haka);
