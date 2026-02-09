@@ -156,8 +156,8 @@ static void spawnChild(struct hakaContext *haka, char *argv[]) {
   }
   if (pid == 0) {
     ILOG("Executing %s", *argv);
-    execv(argv[0], argv);
-    perror("execv failed to child");
+    execvp(argv[0], argv);
+    perror("execvp failed to child");
     exit(1);
   }
   haka->childCount++;
