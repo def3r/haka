@@ -189,6 +189,11 @@ You can use the *api* ptr to call core feature functions and extract data from w
   To kill all procs with keyd: `killall -s 0 keyd`
 
 ## TODO
+- [ ] Are `contextCheck` and `eventHandlerEpilogue` macros needed?
+- [ ] Expose API for current key state(?)
+- [ ] Warning for Multiple binds on a single key
+- [ ] Static core.cpp
+- [ ] Use execvp for path var finding
 - [x] Log levels
 - [ ] Switch to gtk(?): to reduce dependencies.
 - [x] Add a config file option for vars.

@@ -21,19 +21,21 @@
   }                                                                            \
   close(haka->fdPrevFile);
 
-#define eventHandlerEpilogue(haka)                                             \
-  if (haka != NULL) {                                                          \
-    if (haka->fp != NULL) {                                                    \
-      pclose(haka->fp);                                                        \
-      haka->fp = NULL;                                                         \
-    }                                                                          \
-    if (haka->fdNotesFile > 0)                                                 \
-      close(haka->fdNotesFile);                                                \
-    haka->fdNotesFile = -1;                                                    \
-    haka->served = true;                                                       \
+#define eventHandlerEpilogue(haka) \
+  if (haka != NULL) {              \
+    if (haka->fp != NULL) {        \
+      pclose(haka->fp);            \
+      haka->fp = NULL;             \
+    }                              \
+    if (haka->fdNotesFile > 0)     \
+      close(haka->fdNotesFile);    \
+    haka->fdNotesFile = -1;        \
+    haka->served = true;           \
   }
 
 // clang-format off
+static bool keyIsActive(struct hakaContext *haka, int keyCode);
+
 static void switchFile(struct hakaContext *haka);
 static void writeSelectionToFile(struct hakaContext *haka);
 static void openFile(struct hakaContext *haka);
@@ -48,12 +50,14 @@ static void   spawnChild(struct hakaContext *, char *argv[]);
 static int    closeNotesFile(struct hakaContext *haka);
 static size_t writeFP2FD(struct hakaContext *haka);
 static void   triggerTofi(struct hakaContext *haka, FILE **fp);
-// clang-format off
+// clang-format on
 
 static struct coreApi hakaCoreAPI = {
     .ver = HAKA_ABI_VERSION,
 
     .addKeyBind = addKeyBind,
+
+    .keyIsActive = keyIsActive,
 
     .spawnChild = spawnChild,
     .getNotesFile = getNotesFile,
@@ -75,6 +79,13 @@ static struct coreApi hakaCoreAPI = {
 
 struct coreApi* getCoreApi() {
   return &hakaCoreAPI;
+}
+
+static bool keyIsActive(struct hakaContext *haka, int keyCode) {
+  contextCheck(haka);
+  bool active = haka->ks->keyPress[keyCode];
+  eventHandlerEpilogue(haka);
+  return active;
 }
 
 static void switchFile(struct hakaContext *haka) {

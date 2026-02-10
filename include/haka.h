@@ -26,6 +26,12 @@ struct confVars {
   char tofiCfg[BUFSIZE];
 };
 
+struct keyState {
+  int16_t size;
+  struct IntSet* activationCombo;
+  bool* keyPress;
+};
+
 struct hakaContext {
   char execDir[BUFSIZE];
   char notesFileName[BUFSIZE];
@@ -40,12 +46,8 @@ struct hakaContext {
 
   bool served;
   int childCount;
-};
 
-struct keyState {
-  int16_t size;
-  struct IntSet* activationCombo;
-  bool* keyPress;
+  struct keyState* ks;
 };
 
 struct coreApi* getCoreApi();

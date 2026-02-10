@@ -38,6 +38,8 @@ int main() {
   struct keyBindings *kbinds = initKeyBindings(2);
   // clang-format on
 
+  haka->ks = ks;
+
   struct coreApi *api = getCoreApi();
   PluginVector *plugins;
   MakeVector(PluginVector, plugins);

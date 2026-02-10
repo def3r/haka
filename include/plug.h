@@ -5,6 +5,7 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 
 #define HAKA_ABI_VERSION 0x1
 #define BUFSIZE 1024
@@ -24,22 +25,24 @@ struct coreApi {
                 int keyToBind,
                 ...);
 
-  void   (*spawnChild)(struct hakaContext *, char *argv[]);
+  bool   (*keyIsActive)(struct hakaContext*, int keyCode);
+
+  void   (*spawnChild)(struct hakaContext*, char *argv[]);
   void   (*getNotesFile)(struct hakaContext*, char fileName[BUFSIZE * 2]);
-  void   (*switchFile)(struct hakaContext *);
+  void   (*switchFile)(struct hakaContext*);
   void   (*getPrimarySelection)(struct hakaContext*, FILE**);
   int    (*openNotesFile)(struct hakaContext*);
   size_t (*writeFP2FD)(struct hakaContext*);
   int    (*closeNotesFile)(struct hakaContext*);
-  void   (*writeTextToFile)(struct hakaContext *,
+  void   (*writeTextToFile)(struct hakaContext*,
                             char *prefix, char *suffix);
   void   (*writeSelectionToFile)(struct hakaContext *);
 
 
-  void   (*openFile)(struct hakaContext *);
+  void   (*openFile)(struct hakaContext*);
 
-  void   (*sendTextToFile)(struct hakaContext *, char *text);
-  void   (*triggerTofi)(struct hakaContext *, FILE**);
+  void   (*sendTextToFile)(struct hakaContext*, char *text);
+  void   (*triggerTofi)(struct hakaContext*, FILE**);
 };
 // clang-format on
 
