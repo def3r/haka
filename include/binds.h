@@ -9,35 +9,33 @@
 #define FAIL   -1
 // clang-format on
 
-typedef void (*hakaHook_t)(struct hakaContext*);
+typedef void (*hakaHook_t)(hakaCtx*);
 
-struct keyBinding {
-  struct IntSet* keys;
+typedef struct keyBinding {
+  IntSet* keys;
   hakaHook_t func;
-};
+} keyBinding;
 
-struct keyBindings {
+typedef struct keyBindings {
   int size;
   int capacity;
-  struct keyBinding* kbind;
-};
+  keyBinding* kbind;
+} keyBindings;
 
-typedef int (*pluginInit_t)(struct coreApi*, struct keyBindings*);
+typedef int (*pluginInit_t)(struct coreApi*, keyBindings*);
 
-struct keyBindings* initKeyBindings(int size);
-void freeKeyBindings(struct keyBindings** kbinds);
-void addKeyBind(struct keyBindings* kbinds,
-                void (*func)(struct hakaContext*),
+keyBindings* initKeyBindings(int size);
+void freeKeyBindings(keyBindings** kbinds);
+void addKeyBind(keyBindings* kbinds,
+                void (*func)(hakaCtx*),
                 int keyToBind,
                 ...);
-void pushKeyBind(struct keyBindings* kbinds, struct keyBinding* kbind);
-int executeKeyBind(struct keyBindings* kbinds,
-                   struct keyState* ks,
-                   struct hakaContext* haka);
-void loadBindings(struct hakaContext* haka,
-                  struct keyBindings** kbinds,
-                  struct keyState* ks,
-                  struct coreApi* api,
+void pushKeyBind(keyBindings* kbinds, keyBinding* kbind);
+int executeKeyBind(keyBindings* kbinds, keyState* ks, hakaCtx* haka);
+void loadBindings(hakaCtx* haka,
+                  keyBindings** kbinds,
+                  keyState* ks,
+                  coreApi* api,
                   PluginVector** plugins);
 
 void freePlugins(PluginVector** plugins);

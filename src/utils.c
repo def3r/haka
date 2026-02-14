@@ -12,8 +12,8 @@
 #include "base.h"
 #include "utils.h"
 
-struct IntSet *initIntSet(int capacity) {
-  struct IntSet *set = (struct IntSet *)malloc(sizeof(struct IntSet));
+IntSet* initIntSet(int capacity) {
+  IntSet* set = (IntSet*)malloc(sizeof(IntSet));
   if (set == NULL) {
     perror("Unable to allocate IntSet.");
     exit(1);
@@ -21,12 +21,12 @@ struct IntSet *initIntSet(int capacity) {
 
   set->size = 0;
   set->capacity = capacity;
-  set->set = (int *)malloc(sizeof(int) * capacity);
+  set->set = (int*)malloc(sizeof(int) * capacity);
 
   return set;
 }
 
-void freeIntSet(struct IntSet **set) {
+void freeIntSet(IntSet** set) {
   if (set == NULL || *set == NULL) {
     return;
   }
@@ -36,7 +36,7 @@ void freeIntSet(struct IntSet **set) {
   *set = NULL;
 }
 
-int pushIntSet(struct IntSet *set, int val) {
+int pushIntSet(IntSet* set, int val) {
   if (set == NULL) {
     exit(1);
   }
@@ -55,9 +55,9 @@ int pushIntSet(struct IntSet *set, int val) {
   return 0;
 }
 
-int dynamicInc(struct IntSet *set) {
+int dynamicInc(IntSet* set) {
   int newCapacity = set->capacity * 2;
-  int *newArr = (int *)malloc(sizeof(int) * newCapacity);
+  int* newArr = (int*)malloc(sizeof(int) * newCapacity);
   if (newArr == NULL) {
     return 1;
   }
@@ -94,7 +94,7 @@ void forceSudo() {
   exit(1);
 }
 
-int checkPackage(const char *pkgName) {
+int checkPackage(const char* pkgName) {
   char cmd[512];
   sprintf(cmd, "which %s > /dev/null 2>&1", pkgName);
 
@@ -112,7 +112,7 @@ int checkPackage(const char *pkgName) {
   return 0;
 }
 
-void switchGrp(gid_t *curGID, const char *grpnam) {
+void switchGrp(gid_t* curGID, const char* grpnam) {
   if (grpnam == NULL && curGID != NULL) {
     if (setgid(*curGID) < 0) {
       perror("Unable to set grp id");
@@ -121,7 +121,7 @@ void switchGrp(gid_t *curGID, const char *grpnam) {
     return;
   }
 
-  struct group *grp = getgrnam(grpnam);
+  struct group* grp = getgrnam(grpnam);
   if (grp == NULL) {
     char erStr[BUFSIZE];
     sprintf(erStr, "Cannot find an `%s` group.", grpnam);
@@ -135,8 +135,8 @@ void switchGrp(gid_t *curGID, const char *grpnam) {
   }
 }
 
-int getKbdEvents(struct IntSet *set) {
-  DIR *dir = opendir("/dev/input/by-path/");
+int getKbdEvents(IntSet* set) {
+  DIR* dir = opendir("/dev/input/by-path/");
   if (dir == NULL) {
     perror("Failed to open directory");
     exit(1);
@@ -147,7 +147,7 @@ int getKbdEvents(struct IntSet *set) {
     set = initIntSet(2);
   }
 
-  struct dirent *entry = NULL;
+  struct dirent* entry = NULL;
 
   const size_t bfrsiz = 1024;
   char symlinkTo[bfrsiz], absPath[bfrsiz];
@@ -159,7 +159,7 @@ int getKbdEvents(struct IntSet *set) {
     }
 
     char compVal[10] = {};
-    strncpy(compVal, entry->d_name + dNameLen - 9, 10); // do copy the \0
+    strncpy(compVal, entry->d_name + dNameLen - 9, 10);  // do copy the \0
     if (strcmp("event-kbd", compVal) != 0) {
       continue;
     }
@@ -192,10 +192,10 @@ int getKbdEvents(struct IntSet *set) {
   return 0;
 }
 
-int openKbdDevices(struct IntSet *set, int *fds, struct libevdev **devs) {
+int openKbdDevices(IntSet* set, int* fds, struct libevdev** devs) {
   int fd;
   char kbd[BUFSIZE];
-  struct libevdev *dev = NULL;
+  struct libevdev* dev = NULL;
 
   ILOG("------");
   for (int i = 0; i < set->size; i++) {
@@ -217,17 +217,17 @@ int openKbdDevices(struct IntSet *set, int *fds, struct libevdev **devs) {
   return 0;
 }
 
-char *getEnvVar(const char *var) {
+char* getEnvVar(const char* var) {
   char cmd[BUFSIZE];
   strCpyCat(cmd, "echo ", var);
 
-  FILE *fp = popen(cmd, "r");
+  FILE* fp = popen(cmd, "r");
   if (fp == NULL) {
     Fprintln(stderr, "Unable to get Env Var %s", var);
     return NULL;
   }
 
-  char *res = (char *)malloc(sizeof(char) * BUFSIZE);
+  char* res = (char*)malloc(sizeof(char) * BUFSIZE);
   if (fgets(res, BUFSIZE, fp)) {
     res[strcspn(res, "\n")] = '\0';
   }
@@ -239,14 +239,14 @@ char *getEnvVar(const char *var) {
 
 // }}}
 
-char *ltrim(char *s) {
+char* ltrim(char* s) {
   for (; s != NULL && (*s == ' ' || *s == '\t'); s++)
     ;
   return s;
 }
 
-char *rtrim(char *s) {
-  char *t = &s[0] + strlen(s) - 1;
+char* rtrim(char* s) {
+  char* t = &s[0] + strlen(s) - 1;
   for (; (t >= s) && (*t == ' ' || *t == '\t'); t--)
     ;
   if (t != NULL)
@@ -254,17 +254,17 @@ char *rtrim(char *s) {
   return s;
 }
 
-char *trim(char *s) {
+char* trim(char* s) {
   s = ltrim(s);
   return rtrim(s);
 }
 
-char *expandValidDir(char *val) {
+char* expandValidDir(char* val) {
   if (val[strlen(val) - 1] == '\\' || val[strlen(val) - 1] == '/') {
     val[strlen(val) - 1] = '\0';
   }
   if (val[0] == '~' && (val[1] == '/' || val[1] == '\\')) {
-    char *home = getEnvVar("$HOME");
+    char* home = getEnvVar("$HOME");
     val = val + 1;
     strcat(home, val);
     val = home;

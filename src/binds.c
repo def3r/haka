@@ -9,18 +9,17 @@
 #include "haka.h"
 #include "utils.h"
 
-static void setActivationCombo_(struct keyState *ks) {
+static void setActivationCombo_(keyState* ks) {
   ActivationCombo(KEY_LEFTCTRL, KEY_LEFTALT);
 }
 
-struct keyBindings *initKeyBindings(int size) {
+keyBindings* initKeyBindings(int size) {
   if (size < 0) {
     Fprintln(stderr, "keybinds size < 0?");
     exit(EXIT_FAILURE);
   }
 
-  struct keyBindings *kbinds =
-      (struct keyBindings *)malloc(sizeof(struct keyBindings));
+  keyBindings* kbinds = (keyBindings*)malloc(sizeof(keyBindings));
   if (kbinds == 0) {
     Fprintln(stderr, "malloc failed for key bindings");
     exit(EXIT_FAILURE);
@@ -28,7 +27,7 @@ struct keyBindings *initKeyBindings(int size) {
 
   kbinds->size = 0;
   kbinds->capacity = size;
-  kbinds->kbind = (struct keyBinding *)malloc(sizeof(struct keyBinding) * size);
+  kbinds->kbind = (keyBinding*)malloc(sizeof(keyBinding) * size);
   if (kbinds->kbind == 0) {
     Fprintln(stderr, "malloc failed for key binding");
     exit(EXIT_FAILURE);
@@ -37,7 +36,7 @@ struct keyBindings *initKeyBindings(int size) {
   return kbinds;
 }
 
-void freeKeyBindings(struct keyBindings **kbinds) {
+void freeKeyBindings(keyBindings** kbinds) {
   if (kbinds == NULL || *kbinds == NULL) {
     return;
   }
@@ -50,14 +49,16 @@ void freeKeyBindings(struct keyBindings **kbinds) {
   *kbinds = NULL;
 }
 
-void addKeyBind(struct keyBindings *kbinds, void (*func)(struct hakaContext *),
-                int keyToBind, ...) {
+void addKeyBind(keyBindings* kbinds,
+                void (*func)(hakaCtx*),
+                int keyToBind,
+                ...) {
   if (kbinds == 0) {
     Fprintln(stderr, "keybinds are null; abort adding a keybind");
     return;
   }
 
-  struct IntSet *keys = initIntSet(5);
+  IntSet* keys = initIntSet(5);
   pushIntSet(keys, keyToBind);
 
   va_list args;
@@ -69,11 +70,11 @@ void addKeyBind(struct keyBindings *kbinds, void (*func)(struct hakaContext *),
   }
   va_end(args);
 
-  struct keyBinding kbind = (struct keyBinding){.keys = keys, .func = func};
+  keyBinding kbind = (keyBinding){.keys = keys, .func = func};
   pushKeyBind(kbinds, &kbind);
 }
 
-void pushKeyBind(struct keyBindings *kbinds, struct keyBinding *kbind) {
+void pushKeyBind(keyBindings* kbinds, keyBinding* kbind) {
   if (kbinds == 0) {
     Fprintln(stderr, "keybinds are null; abort pushing a keybind");
     return;
@@ -84,25 +85,23 @@ void pushKeyBind(struct keyBindings *kbinds, struct keyBinding *kbind) {
   }
 
   if (kbinds->size >= kbinds->capacity) {
-    struct keyBinding *newKBindArr = (struct keyBinding *)malloc(
-        sizeof(struct keyBinding) * kbinds->capacity * 2);
+    keyBinding* newKBindArr =
+        (keyBinding*)malloc(sizeof(keyBinding) * kbinds->capacity * 2);
     if (newKBindArr == 0) {
       Fprintln(stderr, "malloc failed for dynamic array kbinds");
       exit(EXIT_FAILURE);
     }
-    memcpy(newKBindArr, kbinds->kbind,
-           sizeof(struct keyBinding) * kbinds->capacity);
+    memcpy(newKBindArr, kbinds->kbind, sizeof(keyBinding) * kbinds->capacity);
     free(kbinds->kbind);
     kbinds->kbind = newKBindArr;
     kbinds->capacity *= 2;
   }
 
   kbinds->kbind[kbinds->size++] =
-      (struct keyBinding){.keys = kbind->keys, .func = kbind->func};
+      (keyBinding){.keys = kbind->keys, .func = kbind->func};
 }
 
-int executeKeyBind(struct keyBindings *kbinds, struct keyState *ks,
-                   struct hakaContext *haka) {
+int executeKeyBind(keyBindings* kbinds, keyState* ks, hakaCtx* haka) {
   int retval = FAIL;
   if (kbinds == 0) {
     Fprintln(stderr, "keybinds are null; abort executing a keybind");
@@ -116,8 +115,8 @@ int executeKeyBind(struct keyBindings *kbinds, struct keyState *ks,
   retval++;
   haka->served = false;
   for (int i = 0; i < kbinds->size; i++) {
-    struct keyBinding kbind = kbinds->kbind[i];
-    struct IntSet *keys = kbind.keys;
+    keyBinding kbind = kbinds->kbind[i];
+    IntSet* keys = kbind.keys;
     int j;
     for (j = 0; j < keys->size && ks->keyPress[keys->set[j]]; j++)
       ;
@@ -146,73 +145,77 @@ int executeKeyBind(struct keyBindings *kbinds, struct keyState *ks,
   return retval;
 }
 
-static void loadPlugins(char *path, struct keyBindings *kbinds,
-                        struct coreApi *api, PluginVector *plugins) {
-  DIR *dir = opendir(path);
+static void loadPlugins(char* path,
+                        keyBindings* kbinds,
+                        coreApi* api,
+                        PluginVector* plugins) {
+  DIR* dir = opendir(path);
   if (dir == NULL) {
     Fprintln(stderr, "Cannot open plugins dir: %s", path);
     return;
   }
 
-  struct dirent *entry = NULL;
+  struct dirent* entry = NULL;
   while ((entry = readdir(dir)) != NULL) {
-    void *h;
+    void* h;
     char fullPath[PATH_MAX];
     snprintf(fullPath, sizeof(fullPath), "%s/%s", path, entry->d_name);
 
     switch (entry->d_type) {
-    case DT_DIR: {
-      if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
-        break;
+      case DT_DIR: {
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+          break;
 
-      loadPlugins(fullPath, kbinds, api, plugins);
-    } break;
-
-    case DT_REG: {
-      h = dlopen(fullPath, RTLD_NOW | RTLD_LOCAL);
-    binding:
-      if (h == NULL) {
-        DLOG("Error loading plugin %s: %s", fullPath, dlerror());
-        break;
-      }
-
-      pluginInit_t init = dlsym(h, "hakaPluginInit");
-      if (init == NULL) {
-        Fprintln(stderr, "Cannot find hakaPluginInit for %s", fullPath);
-        dlclose(h);
-      } else {
-        ILOG("Plugin Loaded: %s", fullPath);
-        if (!init(api, kbinds)) {
-          VectorPush(plugins, h);
-        }
-      }
-    } break;
-
-    default:          // Fallback to sys/stat
-      struct stat st; // NOLINT
-      if (stat(fullPath, &st) == -1) {
-        perror("stat");
-        continue;
-      }
-
-      if (S_ISDIR(st.st_mode)) {
         loadPlugins(fullPath, kbinds, api, plugins);
-      }
+      } break;
 
-      if (S_ISREG(st.st_mode)) {
+      case DT_REG: {
         h = dlopen(fullPath, RTLD_NOW | RTLD_LOCAL);
-        goto binding;
-      }
-      break;
+      binding:
+        if (h == NULL) {
+          DLOG("Error loading plugin %s: %s", fullPath, dlerror());
+          break;
+        }
+
+        pluginInit_t init = dlsym(h, "hakaPluginInit");
+        if (init == NULL) {
+          Fprintln(stderr, "Cannot find hakaPluginInit for %s", fullPath);
+          dlclose(h);
+        } else {
+          ILOG("Plugin Loaded: %s", fullPath);
+          if (!init(api, kbinds)) {
+            VectorPush(plugins, h);
+          }
+        }
+      } break;
+
+      default:           // Fallback to sys/stat
+        struct stat st;  // NOLINT
+        if (stat(fullPath, &st) == -1) {
+          perror("stat");
+          continue;
+        }
+
+        if (S_ISDIR(st.st_mode)) {
+          loadPlugins(fullPath, kbinds, api, plugins);
+        }
+
+        if (S_ISREG(st.st_mode)) {
+          h = dlopen(fullPath, RTLD_NOW | RTLD_LOCAL);
+          goto binding;
+        }
+        break;
     }
   }
 
   closedir(dir);
 }
 
-void loadBindings(struct hakaContext *haka, struct keyBindings **kbinds,
-                  struct keyState *ks, struct coreApi *api,
-                  PluginVector **plugins) {
+void loadBindings(hakaCtx* haka,
+                  keyBindings** kbinds,
+                  keyState* ks,
+                  coreApi* api,
+                  PluginVector** plugins) {
   if (kbinds == 0 || ks == 0) {
     Fprintln(stderr, "cannot bind keys to null");
     exit(EXIT_FAILURE);
@@ -234,7 +237,7 @@ void loadBindings(struct hakaContext *haka, struct keyBindings **kbinds,
   loadPlugins(haka->config->pluginsDir, *kbinds, api, *plugins);
 }
 
-void freePlugins(PluginVector **plugins) {
+void freePlugins(PluginVector** plugins) {
   for (int i = 0; i < (*plugins)->size; i++) {
     dlclose((*plugins)->arr[i]);
   }

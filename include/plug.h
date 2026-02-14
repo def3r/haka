@@ -2,51 +2,51 @@
 #define HAKA_PLUG_H_
 
 #include <linux/input-event-codes.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdbool.h>
 
 #define HAKA_ABI_VERSION 0x1
 #define BUFSIZE 1024
 
-extern struct coreApi* api;
-
-struct hakaContext;
-struct keyBindings;
-struct keyState;
-
 // clang-format off
-struct coreApi {
+typedef struct hakaCtx     hakaCtx;
+typedef struct keyState    keyState;
+typedef struct keyBindings keyBindings;
+
+typedef struct coreApi {
   int ver;
 
-  void   (*addKeyBind)(struct keyBindings* kbinds,
-                void (*func)(struct hakaContext*),
+  void   (*addKeyBind)(keyBindings* kbinds,
+                void (*func)(hakaCtx*),
                 int keyToBind,
                 ...);
 
-  bool   (*keyIsActive)(struct hakaContext*, int keyCode);
+  bool   (*keyIsActive)(hakaCtx*, int keyCode);
 
-  void   (*spawnChild)(struct hakaContext*, char *argv[]);
-  void   (*getNotesFile)(struct hakaContext*, char fileName[BUFSIZE * 2]);
-  void   (*switchFile)(struct hakaContext*);
-  void   (*getPrimarySelection)(struct hakaContext*, FILE**);
-  int    (*openNotesFile)(struct hakaContext*);
-  size_t (*writeFP2FD)(struct hakaContext*);
-  int    (*closeNotesFile)(struct hakaContext*);
-  void   (*writeTextToFile)(struct hakaContext*,
-                            char *prefix, char *suffix);
-  void   (*writeSelectionToFile)(struct hakaContext *);
+  void   (*spawnChild)(hakaCtx*, char *argv[]);
+  void   (*getFile)(hakaCtx*, char fileName[BUFSIZE * 2]);
+  void   (*switchFile)(hakaCtx*);
+  void   (*getPrimarySelection)(hakaCtx*, FILE**);
+  void   (*displayFile)(hakaCtx*);
+  size_t (*writeFP2FD)(hakaCtx*);
+  int    (*closeFile)(hakaCtx*);
+  void   (*appendPadSelToFile)(hakaCtx*,
+                               char *prefix, char *suffix);
+  void   (*appendSelToFile)(hakaCtx *);
 
 
-  void   (*openFile)(struct hakaContext*);
+  void   (*openFile)(hakaCtx*);
 
-  void   (*sendTextToFile)(struct hakaContext*, char *text);
-  void   (*triggerTofi)(struct hakaContext*, FILE**);
-};
+  void   (*appendTextToFile)(hakaCtx*, char *text);
+  void   (*triggerTofi)(hakaCtx*, FILE**);
+} coreApi;
 // clang-format on
 
-int hakaPluginInit(struct coreApi* capi, struct keyBindings* kbinds);
+extern coreApi* api;
+
+int hakaPluginInit(coreApi* capi, keyBindings* kbinds);
 
 #define Validate(capi, kbinds)                             \
   do {                                                     \
@@ -68,7 +68,7 @@ int hakaPluginInit(struct coreApi* capi, struct keyBindings* kbinds);
 // clang-format on
 
 #define BEGIN_BIND                                                           \
-  int hakaPluginInit(struct coreApi* capi, struct keyBindings* kbinds) {     \
+  int hakaPluginInit(coreApi* capi, keyBindings* kbinds) {                   \
     Validate(capi, kbinds);                                                  \
     api = capi;                                                              \
     if (api->ver != HAKA_ABI_VERSION) {                                      \

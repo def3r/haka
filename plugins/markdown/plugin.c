@@ -1,30 +1,30 @@
 #include <linux/input-event-codes.h>
 #include "plug.h"
 
-struct coreApi *api = NULL;
+coreApi* api = NULL;
 
 static char pounds[] = "######";
 
-static void writePointToFile(struct hakaContext *ctx) {
-  api->writeTextToFile(ctx, "- ", "");
+static void writePointToFile(hakaCtx* ctx) {
+  api->appendPadSelToFile(ctx, "- ", "");
 }
 
-static void writeSubPointToFile(struct hakaContext *ctx) {
-  api->writeTextToFile(ctx, "  - ", "");
+static void writeSubPointToFile(hakaCtx* ctx) {
+  api->appendPadSelToFile(ctx, "  - ", "");
 }
 
-static void writeHeadingToFile(struct hakaContext *ctx) {
+static void writeHeadingToFile(hakaCtx* ctx) {
   int n = 0;
   for (int key = KEY_1; key <= KEY_4 && n == 0; key++) {
     n = (api->keyIsActive(ctx, key)) * (key - KEY_1 + 1);
   }
-  char nPounds[9] = {0}; // including whitespace = 9
+  char nPounds[9] = {0};  // including whitespace = 9
   snprintf(nPounds, n + 3, "\n%.*s ", n, pounds);
-  api->writeTextToFile(ctx, nPounds, "");
+  api->appendPadSelToFile(ctx, nPounds, "");
 }
 
-static void sendNewlineToFile(struct hakaContext *ctx) {
-  api->sendTextToFile(ctx, "\n");
+static void sendNewlineToFile(hakaCtx* ctx) {
+  api->appendTextToFile(ctx, "\n");
 }
 
 // clang-format off

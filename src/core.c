@@ -21,38 +21,38 @@
   }                                                                            \
   close(haka->fdPrevFile);
 
-#define eventHandlerEpilogue(haka) \
-  if (haka != NULL) {              \
-    if (haka->fp != NULL) {        \
-      pclose(haka->fp);            \
-      haka->fp = NULL;             \
-    }                              \
-    if (haka->fdNotesFile > 0)     \
-      close(haka->fdNotesFile);    \
-    haka->fdNotesFile = -1;        \
-    haka->served = true;           \
+#define ctxReset(haka)          \
+  if (haka != NULL) {           \
+    if (haka->fp != NULL) {     \
+      pclose(haka->fp);         \
+      haka->fp = NULL;          \
+    }                           \
+    if (haka->fdNotesFile > 0)  \
+      close(haka->fdNotesFile); \
+    haka->fdNotesFile = -1;     \
+    haka->served = true;        \
   }
 
 // clang-format off
-static bool keyIsActive(struct hakaContext *haka, int keyCode);
+static bool keyIsActive(hakaCtx *haka, int keyCode);
 
-static void switchFile(struct hakaContext *haka);
-static void writeSelectionToFile(struct hakaContext *haka);
-static void openFile(struct hakaContext *haka);
-static void sendTextToFile(struct hakaContext *haka, char *text);
-static void writeTextToFile(struct hakaContext *haka, char *prefix,
+static void switchFile(hakaCtx *haka);
+static void appendSelToFile(hakaCtx *haka);
+static void displayFile(hakaCtx *haka);
+static void appendTextToFile(hakaCtx *haka, char *text);
+static void appendPadSelToFile(hakaCtx *haka, char *prefix,
                             char *suffix);
 
-static void   getPrimarySelection(struct hakaContext *haka, FILE **fp);
-static void   getNotesFile(struct hakaContext *haka, char fileName[BUFSIZE * 2]);
-static int    openNotesFile(struct hakaContext *haka);
-static void   spawnChild(struct hakaContext *, char *argv[]);
-static int    closeNotesFile(struct hakaContext *haka);
-static size_t writeFP2FD(struct hakaContext *haka);
-static void   triggerTofi(struct hakaContext *haka, FILE **fp);
+static void   getPrimarySelection(hakaCtx *haka, FILE **fp);
+static void   getFile(hakaCtx *haka, char fileName[BUFSIZE * 2]);
+static void   openFile(hakaCtx *haka);
+static void   spawnChild(hakaCtx *, char *argv[]);
+static int    closeFile(hakaCtx *haka);
+static size_t writeFP2FD(hakaCtx *haka);
+static void   triggerTofi(hakaCtx *haka, FILE **fp);
 // clang-format on
 
-static struct coreApi hakaCoreAPI = {
+static coreApi hakaCoreAPI = {
     .ver = HAKA_ABI_VERSION,
 
     .addKeyBind = addKeyBind,
@@ -60,36 +60,36 @@ static struct coreApi hakaCoreAPI = {
     .keyIsActive = keyIsActive,
 
     .spawnChild = spawnChild,
-    .getNotesFile = getNotesFile,
+    .getFile = getFile,
     .switchFile = switchFile,
     .getPrimarySelection = getPrimarySelection,
-    .openNotesFile = openNotesFile,
+    .displayFile = displayFile,
     .writeFP2FD = writeFP2FD,
-    .closeNotesFile = closeNotesFile,
-    .writeTextToFile = writeTextToFile,
-    .writeSelectionToFile = writeSelectionToFile,
+    .closeFile = closeFile,
+    .appendPadSelToFile = appendPadSelToFile,
+    .appendSelToFile = appendSelToFile,
 
     .openFile = openFile,
 
-    .sendTextToFile = sendTextToFile,
+    .appendTextToFile = appendTextToFile,
     .triggerTofi = triggerTofi,
 };
 
 // }}}
 
-struct coreApi* getCoreApi() {
+coreApi* getCoreApi() {
   return &hakaCoreAPI;
 }
 
-static bool keyIsActive(struct hakaContext *haka, int keyCode) {
-  contextCheck(haka);
-  bool active = haka->ks->keyPress[keyCode];
-  eventHandlerEpilogue(haka);
-  return active;
+static bool keyIsActive(hakaCtx* haka, int keyCode) {
+  ctxCheck(haka);
+  if (!haka->ks || !haka->ks->keyPress)
+    return false;
+  return haka->ks->keyPress[keyCode];
 }
 
-static void switchFile(struct hakaContext *haka) {
-  contextCheck(haka);
+static void switchFile(hakaCtx* haka) {
+  ctxCheck(haka);
 
   ILOG("Launching tofi\n");
   DLOG("tofi.cfg path: %s\n", haka->config->tofiCfg);
@@ -111,48 +111,47 @@ static void switchFile(struct hakaContext *haka) {
     updatePrevFile(haka);
   }
 
-  eventHandlerEpilogue(haka);
+  ctxReset(haka);
 }
 
-static void sendTextToFile(struct hakaContext *haka, char *text) {
-  openNotesFile(haka);
+static void appendTextToFile(hakaCtx* haka, char* text) {
+  openFile(haka);
   if (text != NULL) {
     write(haka->fdNotesFile, text, strlen(text));
   }
-  closeNotesFile(haka);
+  closeFile(haka);
 }
 
-static void writeTextToFile(struct hakaContext *haka, char *prefix,
-                            char *suffix) {
-  contextCheck(haka);
+static void appendPadSelToFile(hakaCtx* haka, char* prefix, char* suffix) {
+  ctxCheck(haka);
 
-  openNotesFile(haka);
+  openFile(haka);
   if (prefix != NULL) {
     write(haka->fdNotesFile, prefix, strlen(prefix));
   }
-  writeSelectionToFile(haka);
-  openNotesFile(haka);
+  appendSelToFile(haka);
+  openFile(haka);
   if (suffix != NULL) {
     write(haka->fdNotesFile, suffix, strlen(suffix));
   }
 
-  eventHandlerEpilogue(haka);
+  ctxReset(haka);
 }
 
-static void writeSelectionToFile(struct hakaContext *haka) {
-  contextCheck(haka);
+static void appendSelToFile(hakaCtx* haka) {
+  ctxCheck(haka);
 
   ILOG("Dispatching request to get primary selection");
   getPrimarySelection(haka, &haka->fp);
-  openNotesFile(haka);
+  openFile(haka);
 
   writeFP2FD(haka);
 
-  eventHandlerEpilogue(haka);
+  ctxReset(haka);
 }
 
-static void spawnChild(struct hakaContext *haka, char *argv[]) {
-  contextCheck(haka);
+static void spawnChild(hakaCtx* haka, char* argv[]) {
+  ctxCheck(haka);
   if (argv == NULL || *argv == NULL) {
     Fprintln(stderr, "no args provided to spawn a child");
     return;
@@ -172,33 +171,37 @@ static void spawnChild(struct hakaContext *haka, char *argv[]) {
     exit(1);
   }
   haka->childCount++;
-
-  eventHandlerEpilogue(haka);
 }
 
-static void openFile(struct hakaContext *haka) {
-  contextCheck(haka);
+static void displayFile(hakaCtx* haka) {
+  ctxCheck(haka);
 
   ILOG("Opening current note in editor\n");
 
   CharVector argv = {.size = 0, .capacity = 0, .arr = NULL};
-  CharVector *argvPtr = &argv;
-  char *arg;
-  ForEach(haka->config->terminal, arg) { VectorPush(argvPtr, arg); }
-  ForEach(haka->config->editor, arg) { VectorPush(argvPtr, arg); }
+  CharVector* argvPtr = &argv;
+  char* arg;
+  ForEach(haka->config->terminal, arg) {
+    VectorPush(argvPtr, arg);
+  }
+  ForEach(haka->config->editor, arg) {
+    VectorPush(argvPtr, arg);
+  }
   VectorPush(argvPtr, haka->notesFile);
   VectorPush(argvPtr, NULL);
 
   DLOG("Executing: ");
-  ForEach(argvPtr, arg) { DLOG("%s ", arg); }
-  spawnChild(haka, (char **)argv.arr);
+  ForEach(argvPtr, arg) {
+    DLOG("%s ", arg);
+  }
+  spawnChild(haka, (char**)argv.arr);
 
-  free(argv.arr); // Better be on stack
-  eventHandlerEpilogue(haka);
+  free(argv.arr);  // Better be on stack
+  ctxReset(haka);
 }
 
-static void getPrimarySelection(struct hakaContext *haka, FILE **fp) {
-  contextCheck(haka);
+static void getPrimarySelection(hakaCtx* haka, FILE** fp) {
+  ctxCheck(haka);
   if (fp == NULL)
     return;
 
@@ -209,12 +212,12 @@ static void getPrimarySelection(struct hakaContext *haka, FILE **fp) {
   }
 }
 
-static void getNotesFile(struct hakaContext *haka, char fileName[BUFSIZE * 2]) {
+static void getFile(hakaCtx* haka, char fileName[BUFSIZE * 2]) {
   strcpy(fileName, haka->notesFile);
 }
 
-static int openNotesFile(struct hakaContext *haka) {
-  contextCheck(haka);
+static void openFile(hakaCtx* haka) {
+  ctxCheck(haka);
 
   haka->fdNotesFile = open(haka->notesFile, O_RDWR | O_CREAT | O_APPEND, 0666);
   if (haka->fdNotesFile < 0) {
@@ -223,18 +226,17 @@ static int openNotesFile(struct hakaContext *haka) {
     perror(errStr);
     exit(1);
   }
-  return haka->fdNotesFile;
 }
 
-static int closeNotesFile(struct hakaContext *haka) {
-  contextCheck(haka);
+static int closeFile(hakaCtx* haka) {
+  ctxCheck(haka);
   int res = close(haka->fdNotesFile);
   haka->fdNotesFile = (res == 0) ? -1 : haka->fdNotesFile;
   return res;
 }
 
-static size_t writeFP2FD(struct hakaContext *haka) {
-  contextCheck(haka);
+static size_t writeFP2FD(hakaCtx* haka) {
+  ctxCheck(haka);
 
   size_t bytes = 0;
   char buf[BUFSIZE];
@@ -248,8 +250,8 @@ static size_t writeFP2FD(struct hakaContext *haka) {
   return bytes;
 }
 
-static void triggerTofi(struct hakaContext *haka, FILE **fp) {
-  contextCheck(haka);
+static void triggerTofi(hakaCtx* haka, FILE** fp) {
+  ctxCheck(haka);
   if (fp == NULL) {
     return;
   }

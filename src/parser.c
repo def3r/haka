@@ -6,19 +6,18 @@
 
 // Private {{{
 
-static int parseConfVal(char *var, char *val, char *arg,
-                        CharVector *argv) {
+static int parseConfVal(char* var, char* val, char* arg, CharVector* argv) {
   while (strlen(val)) {
-    char *word = val;
+    char* word = val;
     NextWord(word);
     if (*word == '\0') {
       // We have reached the end of line
-      arg = (char *)calloc(strlen(val) + 1, sizeof(char));
+      arg = (char*)calloc(strlen(val) + 1, sizeof(char));
       strcat(arg, val);
       VectorPush(argv, arg);
       break;
     }
-    char *begin = NULL;
+    char* begin = NULL;
     char charAt = *word;
     *word = '\0';
 
@@ -45,13 +44,13 @@ static int parseConfVal(char *var, char *val, char *arg,
       *begin = '\0';
 
       begin += 2;
-      FILE *sh = popen(begin, "r");
+      FILE* sh = popen(begin, "r");
       if (sh == NULL) {
         perror("Unable to popen: ");
         exit(1);
       }
 
-      arg = (char *)calloc(BUFSIZE, sizeof(char));
+      arg = (char*)calloc(BUFSIZE, sizeof(char));
       strcat(arg, val);
 
       char res[BUFSIZE];
@@ -81,7 +80,7 @@ static int parseConfVal(char *var, char *val, char *arg,
       *begin = '\0';
       *word = charAt;
       if (strlen(val)) {
-        arg = (char *)calloc(BUFSIZE, sizeof(char));
+        arg = (char*)calloc(BUFSIZE, sizeof(char));
         strcat(arg, val);
         VectorPush(argv, arg);
       }
@@ -96,12 +95,12 @@ static int parseConfVal(char *var, char *val, char *arg,
       }
       *word = '\0';
 
-      arg = (char *)calloc(BUFSIZE, sizeof(char));
+      arg = (char*)calloc(BUFSIZE, sizeof(char));
       strcat(arg, begin);
       VectorPush(argv, arg);
 
     } else {
-      arg = (char *)calloc(strlen(val) + 1, sizeof(char));
+      arg = (char*)calloc(strlen(val) + 1, sizeof(char));
       strcat(arg, val);
       VectorPush(argv, arg);
     }
@@ -114,7 +113,7 @@ static int parseConfVal(char *var, char *val, char *arg,
 
 // }}}
 
-int parseConf(struct confVars *conf, char *line) {
+int parseConf(confVars* conf, char* line) {
   if (line == NULL || conf == NULL) {
     return -1;
   }
@@ -123,7 +122,7 @@ int parseConf(struct confVars *conf, char *line) {
   if (line[0] == '#')
     return 0;
 
-  char *c = line;
+  char* c = line;
   for (; *c != '\0' && *c != '='; c++)
     ;
   if (*c != '=') {
@@ -131,13 +130,13 @@ int parseConf(struct confVars *conf, char *line) {
   }
 
   *c = '\0';
-  char *var = line;
-  char *val = ++c;
+  char* var = line;
+  char* val = ++c;
   var = trim(var);
   val = trim(val);
 
-  char *arg;
-  CharVector *argv;
+  char* arg;
+  CharVector* argv;
   MakeVector(CharVector, argv);
 
   if (parseConfVal(var, val, arg, argv)) {
@@ -165,7 +164,9 @@ int parseConf(struct confVars *conf, char *line) {
   }
 
   DLOG("%s [%d]:", var, argv->size);
-  ForEach(argv, arg) { DLOG("Arg: %s", arg); }
+  ForEach(argv, arg) {
+    DLOG("Arg: %s", arg);
+  }
 
   return 0;
 }

@@ -130,7 +130,7 @@ editor=$(which emacs)
 
 A very basic example to extend a plugin (Assuming *haka* is already running). In *`plugins/default.c`*, add this function:
 ```c
-static void hello_world(struct hakaContext* ctx) {
+static void hello_world(hakaCtx* ctx) {
   printf("Hello World!\n");
 }
 ```
@@ -153,13 +153,13 @@ to reload the plugins and then press *ActivationCombo + H* and you can see
 ### Writing your own Plugin:
 - A plugin is just a shared object (`.so`) inside the *`plugins/`* directory or
   the directory specified in the config file.
-- A function **must** be of the prototype: `void func(struct hakaContext *ctx)` to be `Bind`able. Refer *[`linux/input-event-codes.h`](https://raw.githubusercontent.com/whot/libevdev/refs/heads/master/include/linux/input-event-codes.h)* for `KEY_NAME` macros.
+- A function **must** be of the prototype: `void func(hakaCtx *ctx)` to be `Bind`able. Refer *[`linux/input-event-codes.h`](https://raw.githubusercontent.com/whot/libevdev/refs/heads/master/include/linux/input-event-codes.h)* for `KEY_NAME` macros.
 
 **Boilerplate for plugin:**
 ```c
 #include "plug.h" // Can be found in include/
 
-struct coreApi *api;
+coreApi *api;
 
 /*
   Your functions go here
@@ -192,7 +192,7 @@ You can use the *api* ptr to call core feature functions and extract data from w
 - [ ] Are `contextCheck` and `eventHandlerEpilogue` macros needed?
 - [ ] Expose API for current key state(?)
 - [ ] Warning for Multiple binds on a single key
-- [ ] Static core.cpp
+- [ ] Static core.c
 - [ ] Use execvp for path var finding
 - [x] Log levels
 - [ ] Switch to gtk(?): to reduce dependencies.

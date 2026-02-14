@@ -71,16 +71,16 @@ typedef struct DbVoidPtrVector CharVector;
 
 #define ForEach(v, c) for (int i = 0; i < v->size && (c = v->arr[i]); i++)
 
-struct IntSet {
+typedef struct IntSet {
   int* set;
   int size;
   int capacity;
-};
+} IntSet;
 
-struct IntSet* initIntSet(int capacity);
-void freeIntSet(struct IntSet** set);
-int pushIntSet(struct IntSet* set, int val);
-int dynamicInc(struct IntSet* set);
+IntSet* initIntSet(int capacity);
+void freeIntSet(IntSet** set);
+int pushIntSet(IntSet* set, int val);
+int dynamicInc(IntSet* set);
 
 int checkPackage(const char* pkgName);
 void forceSudo();
@@ -88,8 +88,8 @@ char* getEnvVar(const char* var);
 
 void switchGrp(gid_t* curGID, const char* grpnam);
 
-int getKbdEvents(struct IntSet* set);
-int openKbdDevices(struct IntSet* set, int* fds, struct libevdev* devs[]);
+int getKbdEvents(IntSet* set);
+int openKbdDevices(IntSet* set, int* fds, struct libevdev* devs[]);
 
 char* expandValidDir(char* val);
 
