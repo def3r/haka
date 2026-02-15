@@ -6,11 +6,12 @@ CFLAGS_SO := -fPIC -Wall -Wextra -I../include/ -shared
 SUBDIRS := $(wildcard */)
 SRC := $(wildcard *.c)
 SO  := $(SRC:.c=.so)
+LOG_LEVEL := -DLOG=2
 
 all: $(SO) subdirs
 
 %.so: %.c
-	$(CC) $(CFLAGS_SO) $< -o $@ $(LDFLAGS_SO)
+	$(CC) $(LOG_LEVEL) $(CFLAGS_SO) $< -o $@ $(LDFLAGS_SO)
 
 subdirs:
 	for d in $(SUBDIRS); do \

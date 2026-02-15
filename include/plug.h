@@ -7,6 +7,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+// TODO: This dep kills me. How do we eliminate this
+#include "vector.h"
+
 #define HAKA_ABI_VERSION 0x1
 #define BUFSIZE 1024
 
@@ -25,8 +28,12 @@ typedef struct coreApi {
 
   bool   (*keyIsActive)(hakaCtx*, int keyCode);
 
-  void   (*spawnChild)(hakaCtx*, char *argv[]);
   void   (*getFile)(hakaCtx*, char fileName[BUFSIZE * 2]);
+  void   (*getTerminal)(hakaCtx*, CharVector* v);
+  void   (*getEditor)(hakaCtx*, CharVector* v);
+
+  void   (*spawnChild)(hakaCtx*, char *argv[]);
+  void   (*spawnChildVec)(hakaCtx*, CharVector*);
   void   (*switchFile)(hakaCtx*);
   void   (*getPrimarySelection)(hakaCtx*, FILE**);
   void   (*displayFile)(hakaCtx*);

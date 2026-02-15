@@ -10,7 +10,7 @@
 #include "binds.h"
 #include "haka.h"
 #include "plug.h"
-#include "utils.h"
+#include "vector.h"
 
 // Declarations & Core Api Def {{{
 
@@ -47,9 +47,13 @@ static void   getPrimarySelection(hakaCtx *haka, FILE **fp);
 static void   getFile(hakaCtx *haka, char fileName[BUFSIZE * 2]);
 static void   openFile(hakaCtx *haka);
 static void   spawnChild(hakaCtx *, char *argv[]);
+static void   spawnChildVec(hakaCtx*, CharVector*);
 static int    closeFile(hakaCtx *haka);
 static size_t writeFP2FD(hakaCtx *haka);
 static void   triggerTofi(hakaCtx *haka, FILE **fp);
+
+static void getTerminal(hakaCtx* haka, CharVector* v);
+static void getEditor(hakaCtx* haka, CharVector* v);
 // clang-format on
 
 static coreApi hakaCoreAPI = {
@@ -59,8 +63,12 @@ static coreApi hakaCoreAPI = {
 
     .keyIsActive = keyIsActive,
 
-    .spawnChild = spawnChild,
     .getFile = getFile,
+    .getTerminal = getTerminal,
+    .getEditor = getEditor,
+
+    .spawnChild = spawnChild,
+    .spawnChildVec = spawnChildVec,
     .switchFile = switchFile,
     .getPrimarySelection = getPrimarySelection,
     .displayFile = displayFile,
@@ -173,6 +181,15 @@ static void spawnChild(hakaCtx* haka, char* argv[]) {
   haka->childCount++;
 }
 
+static void spawnChildVec(hakaCtx* haka, CharVector* v) {
+  if (!haka || !v)
+    return;
+
+  VectorPush(v, NULL);
+  spawnChild(haka, (char**)v->arr);
+  v->size--;
+}
+
 static void displayFile(hakaCtx* haka) {
   ctxCheck(haka);
 
@@ -210,10 +227,6 @@ static void getPrimarySelection(hakaCtx* haka, FILE** fp) {
     perror("popen error.");
     exit(1);
   }
-}
-
-static void getFile(hakaCtx* haka, char fileName[BUFSIZE * 2]) {
-  strcpy(fileName, haka->notesFile);
 }
 
 static void openFile(hakaCtx* haka) {
@@ -269,6 +282,32 @@ static void triggerTofi(hakaCtx* haka, FILE** fp) {
   if (*fp == NULL) {
     perror("popen error.");
     exit(1);
+  }
+}
+
+static void getFile(hakaCtx* haka, char fileName[BUFSIZE * 2]) {
+  strcpy(fileName, haka->notesFile);
+}
+
+static void getTerminal(hakaCtx* haka, CharVector* v) {
+  if (!v || !haka || !haka->config || !haka->config->terminal) {
+    return;
+  }
+  char* arg;
+  ForEach(haka->config->terminal, arg) {
+    char* argCpy = strdup(arg);
+    VectorPush(v, argCpy);
+  }
+}
+
+static void getEditor(hakaCtx* haka, CharVector* v) {
+  if (!v || !haka || !haka->config || !haka->config->terminal) {
+    return;
+  }
+  char* arg;
+  ForEach(haka->config->editor, arg) {
+    char* argCpy = strdup(arg);
+    VectorPush(v, arg);
   }
 }
 

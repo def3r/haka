@@ -21,7 +21,7 @@ LOG_LEVEL := -DLOG=2
 all: $(OUT) plugins
 
 plugins:
-	$(MAKE) -C plugins CFLAGS_SO="$(CFLAGS_SO)"
+	$(MAKE) -C plugins CFLAGS_SO="$(CFLAGS_SO)" LOG_LEVEL="$(LOG_LEVEL)"
 
 $(OUT): $(SRC) $(LDLIBS)
 	$(CC) $(LOG_LEVEL) $(CFLAGS) -o $@ $^ $(LDLIBS)
