@@ -10,22 +10,29 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#include "hakaBase.h"
-#include "hakaUtils.h"
+#include "base.h"
+#include "utils.h"
 
 static volatile sig_atomic_t live = true;
 static void handler(int signum) {
   live = false;
 }
 
-struct confVars {
-  char editor[BUFSIZE];
+typedef struct confVars {
+  CharVector* editor;
+  CharVector* terminal;
+  char pluginsDir[BUFSIZE];
   char notesDir[BUFSIZE];
-  char terminal[BUFSIZE];
   char tofiCfg[BUFSIZE];
-};
+} confVars;
 
-struct hakaContext {
+typedef struct keyState {
+  int16_t size;
+  IntSet* activationCombo;
+  bool* keyPress;
+} keyState;
+
+typedef struct hakaCtx {
   char execDir[BUFSIZE];
   char notesFileName[BUFSIZE];
   char notesFile[BUFSIZE * 2];
@@ -35,35 +42,34 @@ struct hakaContext {
   char prevFile[BUFSIZE];
 
   FILE* fp;
-  struct confVars* config;
+  confVars* config;
 
   bool served;
   int childCount;
-};
 
-struct keyState {
-  int16_t size;
-  struct IntSet* activationCombo;
-  bool* keyPress;
-};
+  keyState* ks;
+} hakaCtx;
 
-struct hakaContext* initHaka();
-struct confVars* initConf(struct hakaContext* haka);
-void getExeDir(struct hakaContext* haka);
-void getPrevFile(struct hakaContext* haka);
+coreApi* getCoreApi();
 
-struct keyState* initKeyState(int16_t size);
-void handleKeyEvent(struct keyState* ks, int evCode, int evVal);
-void setActivationCombo(struct keyState* ks, ...);
-bool resetActivationCombo(struct keyState* ks);
-bool activated(struct keyState* ks);
+hakaCtx* initHaka();
+confVars* initConf(hakaCtx* haka);
+void getExeDir(hakaCtx* haka);
+void getPrevFile(hakaCtx* haka);
 
-void reapChild(struct hakaContext* haka);
+keyState* initKeyState(int16_t size);
+void handleKeyEvent(keyState* ks, int evCode, int evVal);
+void setActivationCombo(keyState* ks, ...);
+bool resetActivationCombo(keyState* ks);
+bool activated(keyState* ks);
+int parseConf(confVars* conf, char* line);
+
+void reapChild(hakaCtx* haka);
 
 #define SUPPORTED_KEYS 249
 #define ActivationCombo(...) setActivationCombo(ks, __VA_ARGS__, -1)
 
-#define contextCheck(haka)                                       \
+#define ctxCheck(haka)                                           \
   if (haka == NULL) {                                            \
     fprintf(stderr, "The hakaContext object cannot be NULL.\n"); \
     exit(1);                                                     \
@@ -72,5 +78,8 @@ void reapChild(struct hakaContext* haka);
 #define buildAbsFilePath(haka)                                            \
   snprintf(haka->notesFile, BUFSIZE * 2, "%s/%s", haka->config->notesDir, \
            haka->notesFileName);
+
+#define NextWord(word) \
+  for (; *word != '\0' && *word != ' ' && *word != '\t'; word++)
 
 #endif

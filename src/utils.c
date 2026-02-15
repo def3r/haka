@@ -1,4 +1,5 @@
 #include <dirent.h>
+#include <dlfcn.h>
 #include <fcntl.h>
 #include <grp.h>
 #include <stdio.h>
@@ -8,11 +9,11 @@
 
 #include <libevdev/libevdev.h>
 
-#include "hakaBase.h"
-#include "hakaUtils.h"
+#include "base.h"
+#include "utils.h"
 
-struct IntSet *initIntSet(int capacity) {
-  struct IntSet *set = (struct IntSet *)malloc(sizeof(struct IntSet));
+IntSet* initIntSet(int capacity) {
+  IntSet* set = (IntSet*)malloc(sizeof(IntSet));
   if (set == NULL) {
     perror("Unable to allocate IntSet.");
     exit(1);
@@ -20,12 +21,22 @@ struct IntSet *initIntSet(int capacity) {
 
   set->size = 0;
   set->capacity = capacity;
-  set->set = (int *)malloc(sizeof(int) * capacity);
+  set->set = (int*)malloc(sizeof(int) * capacity);
 
   return set;
 }
 
-int pushIntSet(struct IntSet *set, int val) {
+void freeIntSet(IntSet** set) {
+  if (set == NULL || *set == NULL) {
+    return;
+  }
+
+  free((*set)->set);
+  free(*set);
+  *set = NULL;
+}
+
+int pushIntSet(IntSet* set, int val) {
   if (set == NULL) {
     exit(1);
   }
@@ -44,9 +55,9 @@ int pushIntSet(struct IntSet *set, int val) {
   return 0;
 }
 
-int dynamicInc(struct IntSet *set) {
+int dynamicInc(IntSet* set) {
   int newCapacity = set->capacity * 2;
-  int *newArr = (int *)malloc(sizeof(int) * newCapacity);
+  int* newArr = (int*)malloc(sizeof(int) * newCapacity);
   if (newArr == NULL) {
     return 1;
   }
@@ -61,6 +72,8 @@ int dynamicInc(struct IntSet *set) {
   set->set = newArr;
   return 0;
 }
+
+// Essential {{{
 
 void forceSudo() {
   if (!getuid()) {
@@ -81,25 +94,25 @@ void forceSudo() {
   exit(1);
 }
 
-int checkPackage(const char *pkgName) {
+int checkPackage(const char* pkgName) {
   char cmd[512];
   sprintf(cmd, "which %s > /dev/null 2>&1", pkgName);
 
   int retVal = system(cmd);
   if (retVal == -1) {
-    printf("system() failed to execute.");
+    Println("system() failed to execute.");
     perror("system err: ");
     exit(1);
   }
   if (WEXITSTATUS(retVal) != 0) {
-    printf("Cannot find %s in PATH\n", pkgName);
-    printf("which %s returned %d\n", pkgName, WEXITSTATUS(retVal));
+    Println("Cannot find %s in PATH", pkgName);
+    Println("which %s returned %d", pkgName, WEXITSTATUS(retVal));
     return 1;
   }
   return 0;
 }
 
-void switchGrp(gid_t *curGID, const char *grpnam) {
+void switchGrp(gid_t* curGID, const char* grpnam) {
   if (grpnam == NULL && curGID != NULL) {
     if (setgid(*curGID) < 0) {
       perror("Unable to set grp id");
@@ -108,7 +121,7 @@ void switchGrp(gid_t *curGID, const char *grpnam) {
     return;
   }
 
-  struct group *grp = getgrnam(grpnam);
+  struct group* grp = getgrnam(grpnam);
   if (grp == NULL) {
     char erStr[BUFSIZE];
     sprintf(erStr, "Cannot find an `%s` group.", grpnam);
@@ -122,19 +135,19 @@ void switchGrp(gid_t *curGID, const char *grpnam) {
   }
 }
 
-int getKbdEvents(struct IntSet *set) {
-  DIR *dir = opendir("/dev/input/by-path/");
+int getKbdEvents(IntSet* set) {
+  DIR* dir = opendir("/dev/input/by-path/");
   if (dir == NULL) {
     perror("Failed to open directory");
     exit(1);
   }
-  printf("ref for /dev/input/by-path/ created @ %p\n", dir);
+  ILOG("ref for /dev/input/by-path/ created @ %p", dir);
 
   if (set == NULL) {
     set = initIntSet(2);
   }
 
-  struct dirent *entry = NULL;
+  struct dirent* entry = NULL;
 
   const size_t bfrsiz = 1024;
   char symlinkTo[bfrsiz], absPath[bfrsiz];
@@ -145,8 +158,8 @@ int getKbdEvents(struct IntSet *set) {
       continue;
     }
 
-    char compVal[9];
-    strncpy(compVal, entry->d_name + dNameLen - 9, 9);
+    char compVal[10] = {};
+    strncpy(compVal, entry->d_name + dNameLen - 9, 10);  // do copy the \0
     if (strcmp("event-kbd", compVal) != 0) {
       continue;
     }
@@ -159,32 +172,35 @@ int getKbdEvents(struct IntSet *set) {
     }
     symlinkTo[len] = '\0';
 
-    printf("Entry: /dev/input/by-path/%s\t\tis a symlink to -> %s\n",
-           entry->d_name, symlinkTo);
+    ILOG("Entry: /dev/input/by-path/%s\t\tis a symlink to -> %s", entry->d_name,
+         symlinkTo);
     pushIntSet(set, atoi((symlinkTo + 8)));
   }
 
   closedir(dir);
 
   int size = set->size;
-  printf("eventX is a keyboard Event | X =  ");
+  char setStr[BUFSIZE] = {};
   while (size-- > 0) {
-    printf("%d, ", set->set[size]);
+    size_t slen = strlen(setStr);
+    if (slen < BUFSIZE) {
+      snprintf(setStr + slen, BUFSIZE - slen, "%d, ", set->set[size]);
+    }
   }
-  printf("\b\b;\n");
+  ILOG("eventX is a keyboard Event | X = %s\b\b;", setStr);
 
   return 0;
 }
 
-int openKbdDevices(struct IntSet *set, int *fds, struct libevdev **devs) {
+int openKbdDevices(IntSet* set, int* fds, struct libevdev** devs) {
   int fd;
   char kbd[BUFSIZE];
-  struct libevdev *dev = NULL;
+  struct libevdev* dev = NULL;
 
-  Fprintln(stdout, "------");
+  ILOG("------");
   for (int i = 0; i < set->size; i++) {
     snprintf(kbd, BUFSIZE, "/dev/input/event%d", set->set[i]);
-    Fprintln(stdout, "Opening: %s", kbd);
+    ILOG("Opening: %s", kbd);
 
     fd = open(kbd, O_RDONLY | O_NONBLOCK);
     if (fd < 0) {
@@ -193,25 +209,25 @@ int openKbdDevices(struct IntSet *set, int *fds, struct libevdev **devs) {
     }
 
     libevdev_new_from_fd(fd, &dev);
-    Fprintln(stdout, "Device: %s\nfd: %d", libevdev_get_name(dev), fd);
-    Fprintln(stdout, "Listening for key events...\n------");
+    ILOG("Device: %s\nfd: %d", libevdev_get_name(dev), fd);
+    ILOG("Listening for key events...\n------");
     fds[i] = fd;
     devs[i] = dev;
   }
   return 0;
 }
 
-char *getEnvVar(const char *var) {
+char* getEnvVar(const char* var) {
   char cmd[BUFSIZE];
   strCpyCat(cmd, "echo ", var);
 
-  FILE *fp = popen(cmd, "r");
+  FILE* fp = popen(cmd, "r");
   if (fp == NULL) {
-    fprintf(stderr, "Unable to get Env Var %s\n", var);
+    Fprintln(stderr, "Unable to get Env Var %s", var);
     return NULL;
   }
 
-  char *res = (char *)malloc(sizeof(char) * BUFSIZE);
+  char* res = (char*)malloc(sizeof(char) * BUFSIZE);
   if (fgets(res, BUFSIZE, fp)) {
     res[strcspn(res, "\n")] = '\0';
   }
@@ -221,14 +237,16 @@ char *getEnvVar(const char *var) {
   return res;
 }
 
-char *ltrim(char *s) {
+// }}}
+
+char* ltrim(char* s) {
   for (; s != NULL && (*s == ' ' || *s == '\t'); s++)
     ;
   return s;
 }
 
-char *rtrim(char *s) {
-  char *t = &s[0] + strlen(s) - 1;
+char* rtrim(char* s) {
+  char* t = &s[0] + strlen(s) - 1;
   for (; (t >= s) && (*t == ' ' || *t == '\t'); t--)
     ;
   if (t != NULL)
@@ -236,7 +254,23 @@ char *rtrim(char *s) {
   return s;
 }
 
-char *trim(char *s) {
+char* trim(char* s) {
   s = ltrim(s);
   return rtrim(s);
 }
+
+char* expandValidDir(char* val) {
+  if (val[strlen(val) - 1] == '\\' || val[strlen(val) - 1] == '/') {
+    val[strlen(val) - 1] = '\0';
+  }
+  if (val[0] == '~' && (val[1] == '/' || val[1] == '\\')) {
+    char* home = getEnvVar("$HOME");
+    val = val + 1;
+    strcat(home, val);
+    val = home;
+  }
+
+  return val;
+}
+
+// vim: foldmethod=marker

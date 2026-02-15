@@ -3,6 +3,8 @@
 
 #define BUFSIZE 1024
 
+typedef struct coreApi coreApi;
+
 #define strCpyCat(dest, src, append) \
   strcpy(dest, src);                 \
   strcat(dest, append)

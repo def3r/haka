@@ -2,6 +2,8 @@
 *.txt
 *.xz
 *.service
+*.so
 
 notes/
 libevdev-1.12.1/
+./plugins/

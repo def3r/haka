@@ -1,3 +1,4 @@
+#include <dlfcn.h>
 #include <errno.h>
 #include <linux/input-event-codes.h>
 #include <signal.h>
@@ -10,10 +11,10 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include "base.h"
+#include "binds.h"
 #include "haka.h"
-#include "hakaBase.h"
-#include "hakaEventHandler.h"
-#include "hakaUtils.h"
+#include "utils.h"
 
 int main() {
   // Need to disable full buffering and switch to
@@ -31,21 +32,27 @@ int main() {
   sigaction(SIGTERM, &sa, 0);
 
   // clang-format off
-  struct IntSet      *set    = initIntSet(2);
-  struct hakaContext *haka   = initHaka();
-  struct keyState    *ks     = initKeyState(SUPPORTED_KEYS);
-  struct keyBindings *kbinds = initKeyBindings(2);
+  IntSet      *set    = initIntSet(2);
+  hakaCtx     *haka   = initHaka();
+  keyState    *ks     = initKeyState(SUPPORTED_KEYS);
+  keyBindings *kbinds = initKeyBindings(2);
   // clang-format on
 
+  haka->ks = ks;
+
+  coreApi* api = getCoreApi();
+  PluginVector* plugins;
+  MakeVector(PluginVector, plugins);
+
   // Load Key Binds (./bindings.c)
-  loadBindings(kbinds, ks);
+  loadBindings(haka, &kbinds, ks, api, &plugins);
 
   gid_t curGrp;
   switchGrp(&curGrp, "input");
 
   getKbdEvents(set);
   int fds[set->size];
-  struct libevdev *devs[set->size];
+  struct libevdev* devs[set->size];
   openKbdDevices(set, fds, devs);
 
   switchGrp(&curGrp, NULL);
@@ -85,7 +92,9 @@ int main() {
         handleKeyEvent(ks, ev.code, ev.value);
 
         if (activated(ks)) {
-          executeKeyBind(kbinds, ks, haka);
+          if (executeKeyBind(kbinds, ks, haka) == RELOAD) {
+            loadBindings(haka, &kbinds, ks, api, &plugins);
+          }
         }
 
         if (haka->childCount > 0) {
@@ -95,12 +104,14 @@ int main() {
     }
   }
 
-  Println("Clean up initiated");
+  DLOG("Clean up initiated");
   for (int i = 0; i < set->size; i++) {
     libevdev_free(devs[i]);
     close(fds[i]);
   }
-  free(set);
+  freeIntSet(&set);
+  DeepFreeVector(haka->config->editor);
+  DeepFreeVector(haka->config->terminal);
   free(haka->config);
   free(haka);
 
@@ -108,33 +119,14 @@ int main() {
   free(ks->activationCombo);
   free(ks);
 
-  free(kbinds->kbind->keys);
-  free(kbinds->kbind);
-  free(kbinds);
-  Println("Clean up complete");
+  freeKeyBindings(&kbinds);
+  freePlugins(&plugins);
+  DLOG("Clean up complete");
 
   return 0;
 }
 
-struct keyState *initKeyState(int16_t size) {
-  struct keyState *ks = (struct keyState *)malloc(sizeof(struct keyState));
-  if (ks == 0) {
-    Fprintln(stderr, "malloc failed for keymap");
-    exit(EXIT_FAILURE);
-  }
-
-  ks->size = size;
-  ks->activationCombo = initIntSet(2);
-  ks->keyPress = (bool *)calloc(size, sizeof(bool));
-  if (ks->keyPress == 0) {
-    Fprintln(stderr, "calloc failed for keymap");
-    exit(EXIT_FAILURE);
-  }
-
-  return ks;
-}
-
-void handleKeyEvent(struct keyState *ks, int evCode, int evVal) {
+void handleKeyEvent(keyState* ks, int evCode, int evVal) {
   if (ks == 0) {
     Fprintln(stderr, "keyState pointer cannot be null to handle keys");
     return;
@@ -150,7 +142,7 @@ void handleKeyEvent(struct keyState *ks, int evCode, int evVal) {
   ks->keyPress[evCode] = evVal;
 }
 
-void setActivationCombo(struct keyState *ks, ...) {
+void setActivationCombo(keyState* ks, ...) {
   if (!resetActivationCombo(ks)) {
     Fprintln(stderr, "abort set activation combo");
     return;
@@ -168,7 +160,7 @@ void setActivationCombo(struct keyState *ks, ...) {
   }
 }
 
-bool resetActivationCombo(struct keyState *ks) {
+bool resetActivationCombo(keyState* ks) {
   if (ks == 0) {
     Fprintln(stderr,
              "keystatus object cannot be null; activaition key reset ignored");
@@ -183,7 +175,7 @@ bool resetActivationCombo(struct keyState *ks) {
   return true;
 }
 
-bool activated(struct keyState *ks) {
+bool activated(keyState* ks) {
   for (int i = 0; i < ks->activationCombo->size; i++) {
     if (!ks->keyPress[ks->activationCombo->set[i]]) {
       return false;
@@ -192,94 +184,54 @@ bool activated(struct keyState *ks) {
   return true;
 }
 
-int parseConf(struct confVars *conf, char *line) {
-  if (line == NULL || conf == NULL) {
-    return -1;
+// Initialization {{{
+
+keyState* initKeyState(int16_t size) {
+  keyState* ks = (keyState*)malloc(sizeof(keyState));
+  if (ks == 0) {
+    Fprintln(stderr, "malloc failed for keymap");
+    exit(EXIT_FAILURE);
   }
 
-  line = trim(line);
-  if (line[0] == '#')
-    return 0;
-
-  char *c = line;
-  for (; *c != '\0' && *c != '='; c++)
-    ;
-  if (*c != '=') {
-    return 1;
+  ks->size = size;
+  ks->activationCombo = initIntSet(2);
+  ks->keyPress = (bool*)calloc(size, sizeof(bool));
+  if (ks->keyPress == 0) {
+    Fprintln(stderr, "calloc failed for keymap");
+    exit(EXIT_FAILURE);
   }
 
-  *c = '\0';
-  char *var = line;
-  char *val = ++c;
-  var = trim(var);
-  val = trim(val);
-
-  if (strlen(val) >= 3 && val[0] == '$' && val[1] == '(' &&
-      val[strlen(val) - 1] == ')') {
-    val = val + 2;
-    val[strlen(val) - 1] = '\0';
-    FILE *sh = popen(val, "r");
-    if (sh == NULL) {
-      perror("Unable to popen: ");
-      exit(1);
-    }
-
-    strcpy(val, "");
-    char res[BUFSIZE];
-    while (fgets(res, BUFSIZE, sh)) {
-      res[strcspn(res, "\n")] = '\0';
-      strcat(val, res);
-    }
-
-    fclose(sh);
-  }
-
-  if (strcmp(var, "editor") == 0) {
-    strcpy(conf->editor, val);
-  } else if (strcmp(var, "notes-dir") == 0) {
-    if (val[strlen(val) - 1] == '\\' || val[strlen(val) - 1] == '/') {
-      val[strlen(val) - 1] = '\0';
-    }
-    if (val[0] == '~' && (val[1] == '/' || val[1] == '\\')) {
-      char *home = getEnvVar("$HOME");
-      var = var + 1;
-      strcat(home, val);
-      val = home;
-    }
-    strcpy(conf->notesDir, val);
-  } else if (strcmp(var, "tofi-cfg") == 0) {
-    strcpy(conf->tofiCfg, val);
-  } else if (strcmp(var, "terminal") == 0) {
-    strcpy(conf->terminal, val);
-  }
-
-  return 0;
+  return ks;
 }
 
-struct confVars *initConf(struct hakaContext *haka) {
-  haka->config = (struct confVars *)malloc(sizeof(struct confVars));
-  struct confVars *conf = haka->config;
+confVars* initConf(hakaCtx* haka) {
+  haka->config = (confVars*)malloc(sizeof(confVars));
+  confVars* conf = haka->config;
 
-  strcpy(conf->editor, "/usr/bin/nvim");
+  MakeVector(CharVector, conf->editor);
+  MakeVector(CharVector, conf->terminal);
+
+  VectorPush(conf->editor, "/usr/bin/nvim");
   strCpyCat(conf->notesDir, haka->execDir, "/notes");
   strCpyCat(conf->tofiCfg, haka->execDir, "/tofi.cfg");
+  strCpyCat(conf->pluginsDir, haka->execDir, "/plugins");
 
-  char *term = getEnvVar("$TERM");
+  char* term = getEnvVar("$TERM");
   if (term == NULL) {
-    fprintf(stderr, "Cannot get var $TERM, recieved NULL\n");
+    Fprintln(stderr, "Cannot get var $TERM, recieved NULL");
   }
   if (strcmp(term, "") == 0) {
-    fprintf(stderr, "Cannot get var $TERM, recieved '%s'\n", term);
-    strcpy(conf->terminal, "alacritty");
+    Fprintln(stderr, "Cannot get var $TERM, recieved '%s'", term);
+    VectorPush(conf->terminal, "alacritty");
   } else {
-    strcpy(conf->terminal, term);
+    VectorPush(conf->terminal, term);
   }
 
   char configFile[BUFSIZE];
   strCpyCat(configFile, haka->execDir, "/haka.cfg");
-  FILE *file = fopen(configFile, "r");
+  FILE* file = fopen(configFile, "r");
   if (file == NULL) {
-    printf("No config file haka.cfg found in execDir: %s\n", haka->execDir);
+    ILOG("No config file haka.cfg found in execDir: %s", haka->execDir);
     return conf;
   }
 
@@ -294,7 +246,7 @@ struct confVars *initConf(struct hakaContext *haka) {
   return conf;
 }
 
-struct hakaContext *initHaka() {
+hakaCtx* initHaka() {
   if (checkPackage("wl-copy") || checkPackage("wl-paste")) {
     printf("please install wl-clipboard: sudo pacman -S wl-clipboard\n");
     exit(1);
@@ -304,8 +256,7 @@ struct hakaContext *initHaka() {
     exit(1);
   }
 
-  struct hakaContext *haka =
-      (struct hakaContext *)malloc(sizeof(struct hakaContext));
+  hakaCtx* haka = (hakaCtx*)malloc(sizeof(hakaCtx));
 
   getExeDir(haka);
   getPrevFile(haka);
@@ -315,7 +266,7 @@ struct hakaContext *initHaka() {
   haka->fp = NULL;
   haka->childCount = 0;
 
-  printf("Notes File: %ld %s\n", strlen(haka->notesFile), haka->notesFile);
+  DLOG("Notes File: %ld %s", strlen(haka->notesFile), haka->notesFile);
 
   // forceSudo();
   //
@@ -341,8 +292,10 @@ struct hakaContext *initHaka() {
   return haka;
 }
 
-void getExeDir(struct hakaContext *haka) {
-  contextCheck(haka);
+// }}}
+
+void getExeDir(hakaCtx* haka) {
+  ctxCheck(haka);
 
   ssize_t nbytes = readlink("/proc/self/exe", haka->execDir, BUFSIZE);
   if (nbytes < 0) {
@@ -350,26 +303,26 @@ void getExeDir(struct hakaContext *haka) {
     exit(1);
   }
   haka->execDir[nbytes] = '\0';
-  printf("Readlink: %s\n", haka->execDir);
+  DLOG("Readlink: %s", haka->execDir);
 
   // Strip off the file name
-  char *p = &haka->execDir[nbytes];
+  char* p = &haka->execDir[nbytes];
   while (*p != '/') {
     p--;
   }
 
   size_t len = p - &haka->execDir[0];
   if (len <= 0) {
-    printf("Invalid path to binary %s", haka->execDir);
+    Fprintln(stderr, "Invalid path to binary %s", haka->execDir);
     exit(1);
   }
   haka->execDir[len] = '\0';
 
-  printf("Dir Path: %s\n", haka->execDir);
+  DLOG("Dir Path: %s", haka->execDir);
 }
 
-void getPrevFile(struct hakaContext *haka) {
-  contextCheck(haka);
+void getPrevFile(hakaCtx* haka) {
+  ctxCheck(haka);
 
   strcpy(haka->notesFileName, "notes.txt\0");
   size_t bytes = strlen(haka->notesFileName);
@@ -387,10 +340,12 @@ void getPrevFile(struct hakaContext *haka) {
   close(haka->fdPrevFile);
 }
 
-void reapChild(struct hakaContext *haka) {
+void reapChild(hakaCtx* haka) {
   pid_t pid;
   while ((pid = waitpid(-1, NULL, WNOHANG)) > 0) {
-    printf("Reaped child proc %d\n", pid);
+    ILOG("Reaped child proc %d", pid);
     haka->childCount--;
   }
 }
+
+// vim: foldmethod=marker
