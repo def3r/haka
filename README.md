@@ -14,6 +14,7 @@ you to write your plugins *entirely* in C. It is dynamic and `hot-reloadable`!
 <!--   <img src="https://github.com/user-attachments/assets/94bfdb3c-b3ee-4772-bb04-be72dfc07517" alt="Haka demo"/> -->
 <!-- </p> -->
 
+# Index
 - [Installation](#build)
   - [Permissions](#permissions)
 - [Daemon](#hakaservice)
@@ -24,8 +25,6 @@ you to write your plugins *entirely* in C. It is dynamic and `hot-reloadable`!
 - [Plugins](#plugins)
   - [Writing your own Plugin](#writing-your-own-plugin)
 - [Troubleshoot](#troubleshoot)
-
----
 
 ## build
 Dependencies
@@ -232,7 +231,7 @@ You can use the *api* ptr to call core feature functions and extract data from w
   To kill all procs with keyd: `sudo killall keyd`
 
 ## TODO
-- [This architecture](https://www.reddit.com/r/linuxquestions/comments/1cn3ylp/how_to_make_sure_that_a_daemon_or_systemd_service/) makes sense
+- [ ] [This architecture](https://www.reddit.com/r/linuxquestions/comments/1cn3ylp/how_to_make_sure_that_a_daemon_or_systemd_service/) makes sense
 - [ ] Instead use `prefix key`(?) (multiple benefits of switching tbh)
 - [ ] Warning for Multiple binds on a single key (Or maybe allow multiple binds?)
 - [x] Static core.c
