@@ -193,7 +193,7 @@ static void spawnChildVec(hakaCtx* haka, CharVector* v) {
 static void displayFile(hakaCtx* haka) {
   ctxCheck(haka);
 
-  ILOG("Opening current note in editor\n");
+  ILOG("Opening current note in editor");
 
   CharVector argv = {.size = 0, .capacity = 0, .arr = NULL};
   CharVector* argvPtr = &argv;

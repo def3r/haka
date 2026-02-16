@@ -229,9 +229,10 @@ You can use the *api* ptr to call core feature functions and extract data from w
   devies, thus leaving `haka` to poll the input devices indefinitely. `kill`ing
   the `keyd` process should resolve the issue.<br>
   Confirm `keyd` is running: `pgrep keyd`.<br>
-  To kill all procs with keyd: `killall -s 0 keyd`
+  To kill all procs with keyd: `sudo killall keyd`
 
 ## TODO
+- [This architecture](https://www.reddit.com/r/linuxquestions/comments/1cn3ylp/how_to_make_sure_that_a_daemon_or_systemd_service/) makes sense
 - [ ] Instead use `prefix key`(?) (multiple benefits of switching tbh)
 - [ ] Warning for Multiple binds on a single key (Or maybe allow multiple binds?)
 - [x] Static core.c
