@@ -30,18 +30,17 @@ typedef struct DbVoidPtrVector CharVector;
     }                 \
   } while (0)
 
-#define DeepFreeVector(v)            \
-  do {                               \
-    if (v != NULL) {                 \
-      while (v->size) {              \
-        if (v->arr[v->size] != NULL) \
-          free(v->arr[v->size]);     \
-        v->size--;                   \
-      }                              \
-      free(v->arr);                  \
-      free(v);                       \
-      v = NULL;                      \
-    }                                \
+#define DeepFreeVector(v)              \
+  do {                                 \
+    if (v != NULL) {                   \
+      while (v->size) {                \
+        if (v->arr[--v->size] != NULL) \
+          free(v->arr[v->size]);       \
+      }                                \
+      free(v->arr);                    \
+      free(v);                         \
+      v = NULL;                        \
+    }                                  \
   } while (0)
 
 #define VectorPush(v, c)                                          \
