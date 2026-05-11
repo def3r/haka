@@ -34,6 +34,8 @@ typedef struct coreApi {
 
   void   (*spawnChild)(hakaCtx*, char *argv[]);
   void   (*spawnChildVec)(hakaCtx*, CharVector*);
+  void   (*switchFileTemp)(hakaCtx* ctx, char* filename);
+  void   (*switchFileRestore)(hakaCtx* ctx);
   void   (*switchFile)(hakaCtx*);
   void   (*getPrimarySelection)(hakaCtx*, FILE**);
   void   (*displayFile)(hakaCtx*);
@@ -41,6 +43,7 @@ typedef struct coreApi {
   int    (*closeFile)(hakaCtx*);
   void   (*appendPadSelToFile)(hakaCtx*,
                                char *prefix, char *suffix);
+  void   (*appendCboardToFile)(hakaCtx *);
   void   (*appendSelToFile)(hakaCtx *);
 
 

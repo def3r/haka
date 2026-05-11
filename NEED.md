@@ -3,6 +3,8 @@ This project aims to solve a problem I face when making notes: efficiently
 creating and organizing notes when you have a large volume of resources and
 limited time.
 
+https://www.bbc.com/future/article/20160307-why-does-walking-through-doorways-make-us-forget
+
 ### The Problem with Existing Solutions
 <ol type="1">
   <li>

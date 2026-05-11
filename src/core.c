@@ -36,13 +36,17 @@
 // clang-format off
 static bool keyIsActive(hakaCtx *haka, int keyCode);
 
+static void switchFileTemp(hakaCtx* ctx, char* filename);
+static void switchFileRestore(hakaCtx* ctx);
 static void switchFile(hakaCtx *haka);
+static void appendCboardToFile(hakaCtx* haka);
 static void appendSelToFile(hakaCtx *haka);
 static void displayFile(hakaCtx *haka);
 static void appendTextToFile(hakaCtx *haka, char *text);
 static void appendPadSelToFile(hakaCtx *haka, char *prefix,
                             char *suffix);
 
+static void   getClipboard(hakaCtx* haka, FILE** fp);
 static void   getPrimarySelection(hakaCtx *haka, FILE **fp);
 static void   getFile(hakaCtx *haka, char fileName[BUFSIZE * 2]);
 static void   openFile(hakaCtx *haka);
@@ -69,12 +73,15 @@ static coreApi hakaCoreAPI = {
 
     .spawnChild = spawnChild,
     .spawnChildVec = spawnChildVec,
+    .switchFileTemp = switchFileTemp,
+    .switchFileRestore = switchFileRestore,
     .switchFile = switchFile,
     .getPrimarySelection = getPrimarySelection,
     .displayFile = displayFile,
     .writeFP2FD = writeFP2FD,
     .closeFile = closeFile,
     .appendPadSelToFile = appendPadSelToFile,
+    .appendCboardToFile = appendCboardToFile,
     .appendSelToFile = appendSelToFile,
 
     .openFile = openFile,
@@ -85,6 +92,8 @@ static coreApi hakaCoreAPI = {
 
 // }}}
 
+static char saved_notesFile[BUFSIZE * 2];
+
 coreApi* getCoreApi() {
   return &hakaCoreAPI;
 }
@@ -94,6 +103,18 @@ static bool keyIsActive(hakaCtx* haka, int keyCode) {
   if (!haka->ks || !haka->ks->keyPress)
     return false;
   return haka->ks->keyPress[keyCode];
+}
+
+static void switchFileTemp(hakaCtx* ctx, char* filename) {
+  if (filename == NULL || strlen(filename) == 0)
+    return;
+  strcpy(saved_notesFile, ctx->notesFile);
+  strcpy(ctx->notesFile, filename);
+}
+
+static void switchFileRestore(hakaCtx* ctx) {
+  strcpy(ctx->notesFile, saved_notesFile);
+  memset(saved_notesFile, '\0', BUFSIZE * 2);
 }
 
 static void switchFile(hakaCtx* haka) {
@@ -158,6 +179,18 @@ static void appendSelToFile(hakaCtx* haka) {
   ctxReset(haka);
 }
 
+static void appendCboardToFile(hakaCtx* haka) {
+  ctxCheck(haka);
+
+  ILOG("Dispatching request to get clipboard");
+  getClipboard(haka, &haka->fp);
+  openFile(haka);
+
+  writeFP2FD(haka);
+
+  ctxReset(haka);
+}
+
 static void spawnChild(hakaCtx* haka, char* argv[]) {
   ctxCheck(haka);
   if (argv == NULL || *argv == NULL) {
@@ -215,6 +248,18 @@ static void displayFile(hakaCtx* haka) {
 
   free(argv.arr);  // Better be on stack
   ctxReset(haka);
+}
+
+static void getClipboard(hakaCtx* haka, FILE** fp) {
+  ctxCheck(haka);
+  if (fp == NULL)
+    return;
+
+  *fp = popen("wl-paste", "r");
+  if (*fp == NULL) {
+    perror("popen error.");
+    exit(1);
+  }
 }
 
 static void getPrimarySelection(hakaCtx* haka, FILE** fp) {

@@ -3,7 +3,7 @@
 > *Haka has become more than just a [notes utility](./NEED.md) it used to be.
 > Those features are now shipped as [`plugins`](#plugins) by default.*
 
-*Haka* is a lightweight, fast, `pluggable` automation tool. It is designed to
+*Haka* is a lightweight, fast, `plugable` automation tool. It is designed to
 run quietly in the background as a `system-service`.
 
 Written completely in C for performance, but it <ins>*does not*</ins>* require
